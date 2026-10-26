@@ -1,0 +1,67 @@
+appId: com.screenblur.desktop
+productName: ScreenBlur
+copyright: Copyright © 2026 ScreenBlur
+asar: true
+npmRebuild: false
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist-electron/**/*
+  - dist/renderer/**/*
+  - package.json
+  - '!**/*.map'
+
+extraResources:
+  # The packaged Python engine. `engine/scripts/build-engine.sh` places the
+  # PyInstaller binary here; omit this block when building without an engine.
+  - from: ../engine/dist
+    to: engine
+    filter:
+      - screenblur-engine
+      - screenblur-engine.exe
+
+mac:
+  category: public.app-category.utilities
+  # Build for the host architecture by default: the bundled engine binary is
+  # architecture-specific. Build the engine on each target arch (or use
+  # electron-builder --x64/--arm64 with a matching binary) for universal ships.
+  target:
+    - target: dmg
+    - target: zip
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  extendInfo:
+    NSCameraUsageDescription: ScreenBlur does not use the camera.
+    NSMicrophoneUsageDescription: ScreenBlur does not use the microphone.
+    NSScreenCaptureUsageDescription: ScreenBlur captures the screen locally to detect sensitive content. Frames never leave this device.
+
+dmg:
+  contents:
+    - x: 140
+      y: 180
+    - x: 400
+      y: 180
+      type: link
+      path: /Applications
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: zip
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+linux:
+  category: Utility
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]

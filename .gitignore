@@ -1,0 +1,27 @@
+# Node / Electron
+node_modules/
+desktop/dist/
+desktop/dist-electron/
+desktop/release/
+desktop/*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+ruff_cache/
+.ruff_cache/
+engine/build/
+engine/dist/
+engine/*.spec
+engine/models/*.onnx
+engine/models/*.ort
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.swp

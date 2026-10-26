@@ -1,0 +1,8 @@
+# Development and packaging dependencies for the ScreenBlur sidecar.
+-r requirements.txt
+
+pytest>=8
+ruff>=0.6
+# Needed by scripts/build-engine.sh. Platform wheels are available for common
+# Python versions; the engine runs from source without it.
+pyinstaller>=6.10

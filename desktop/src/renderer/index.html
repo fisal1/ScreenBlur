@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:5173 http://127.0.0.1:5173; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScreenBlur settings</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="24" height="24" role="presentation">
+            <rect x="3" y="3" width="26" height="26" rx="8" fill="none" stroke="currentColor" stroke-width="2.5" />
+            <path d="M11 21 21 11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+          </svg>
+        </span>
+        <div class="brand-text">
+          <h1>ScreenBlur</h1>
+          <p>On-device screen content moderation</p>
+        </div>
+      </div>
+      <div class="header-status">
+        <span id="status-pill" class="status-pill" data-tone="neutral">
+          <span class="pill-dot" aria-hidden="true"></span>
+          <span id="status-pill-text">Starting…</span>
+        </span>
+        <span class="shortcut-hint"><kbd>⌘/Ctrl</kbd><kbd>⇧</kbd><kbd>B</kbd> pause</span>
+      </div>
+    </header>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <main class="layout">
+      <section class="card status-card" aria-labelledby="status-heading">
+        <div class="card-head">
+          <div>
+            <h2 id="status-heading">Status</h2>
+            <p class="hint">Everything runs locally. No frames or analytics leave this device.</p>
+          </div>
+          <span id="updated-at" class="muted small"></span>
+        </div>
+
+        <div id="permission-banner" class="banner warning" hidden>
+          <div>
+            <strong id="permission-title">Screen Recording permission needed</strong>
+            <p id="permission-text">
+              Grant Screen Recording access to ScreenBlur, then restart the app for capture to start.
+            </p>
+          </div>
+          <button id="btn-permission" type="button" class="button secondary">Open System Settings</button>
+        </div>
+
+        <div class="status-grid">
+          <div class="status-item">
+            <span class="status-label">Engine</span>
+            <span id="engine-state" class="status-value" data-tone="neutral">Stopped</span>
+            <span id="engine-detail" class="muted small">Waiting for engine</span>
+            <span id="engine-meta" class="muted small"></span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Connection</span>
+            <span id="connection-state" class="status-value" data-tone="neutral">Disconnected</span>
+            <span id="connection-detail" class="muted small"></span>
+            <span id="connection-meta" class="muted small"></span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Capture</span>
+            <span id="capture-state" class="status-value" data-tone="neutral">Stopped</span>
+            <span id="capture-detail" class="muted small"></span>
+            <span id="capture-meta" class="muted small"></span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Overlay</span>
+            <span id="overlay-state" class="status-value" data-tone="neutral">Hidden</span>
+            <span id="overlay-detail" class="muted small"></span>
+            <span id="overlay-meta" class="muted small"></span>
+          </div>
+        </div>
+
+        <div class="metrics" role="list" aria-label="Runtime metrics">
+          <div class="metric" role="listitem">
+            <span class="metric-label">Latency</span>
+            <span id="metric-latency" class="metric-value">—</span>
+          </div>
+          <div class="metric" role="listitem">
+            <span class="metric-label">Capture FPS</span>
+            <span id="metric-fps" class="metric-value">—</span>
+          </div>
+          <div class="metric" role="listitem">
+            <span class="metric-label">Frames sent</span>
+            <span id="metric-sent" class="metric-value">0</span>
+          </div>
+          <div class="metric" role="listitem">
+            <span class="metric-label">Dropped</span>
+            <span id="metric-dropped" class="metric-value">0</span>
+          </div>
+          <div class="metric" role="listitem">
+            <span class="metric-label">Last score</span>
+            <span id="metric-score" class="metric-value">—</span>
+          </div>
+          <div class="metric" role="listitem">
+            <span class="metric-label">Last result</span>
+            <span id="metric-result" class="metric-value">—</span>
+          </div>
+        </div>
+
+        <p id="error-line" class="error-line" hidden></p>
+      </section>
+
+      <section class="card" aria-labelledby="monitoring-heading">
+        <div class="card-head">
+          <div>
+            <h2 id="monitoring-heading">Monitoring</h2>
+            <p class="hint">Pause stops capture and hides the overlay while keeping the engine warm.</p>
+          </div>
+        </div>
+        <p id="monitor-status" class="monitor-line">Monitoring is paused.</p>
+        <div class="button-row">
+          <button id="btn-toggle-monitoring" type="button" class="button primary">Resume monitoring</button>
+          <button id="btn-test-overlay" type="button" class="button secondary">Test overlay</button>
+          <button id="btn-restart-engine" type="button" class="button ghost">Restart engine</button>
+        </div>
+        <ul class="hotkey-list">
+          <li><kbd>⌘/Ctrl</kbd><kbd>⇧</kbd><kbd>B</kbd><span>Pause or resume monitoring</span></li>
+          <li><kbd>⌘/Ctrl</kbd><kbd>⇧</kbd><kbd>O</kbd><span>Show the overlay for 3 seconds</span></li>
+          <li><kbd>⌘/Ctrl</kbd><kbd>⇧</kbd><kbd>,</kbd><span>Open settings</span></li>
+        </ul>
+      </section>
+
+      <section class="card" aria-labelledby="detection-heading">
+        <div class="card-head">
+          <div>
+            <h2 id="detection-heading">Detection</h2>
+            <p class="hint">Higher sensitivity means the engine needs more confidence before hiding content.</p>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-head">
+            <label for="sensitivity">Sensitivity</label>
+            <output id="sensitivity-value" for="sensitivity">0.80</output>
+          </div>
+          <input id="sensitivity" type="range" min="0.5" max="0.95" step="0.05" value="0.8" />
+          <p class="hint">Minimum score for a frame to count as sensitive.</p>
+        </div>
+
+        <div class="field-grid">
+          <div class="field">
+            <div class="field-head">
+              <label for="fps">Capture rate</label>
+              <output id="fps-value" for="fps">2 FPS</output>
+            </div>
+            <input id="fps" type="range" min="1" max="5" step="1" value="2" />
+          </div>
+          <div class="field">
+            <div class="field-head">
+              <label for="jpeg-quality">JPEG quality</label>
+              <output id="jpeg-quality-value" for="jpeg-quality">75</output>
+            </div>
+            <input id="jpeg-quality" type="range" min="50" max="95" step="1" value="75" />
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-head">
+            <label for="max-width">Downscale width</label>
+            <output id="max-width-value" for="max-width">1280 px</output>
+          </div>
+          <input id="max-width" type="range" min="320" max="3840" step="80" value="1280" />
+          <p class="hint">Smaller frames reduce CPU and network-free local transfer cost.</p>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="hysteresis-heading">
+        <div class="card-head">
+          <div>
+            <h2 id="hysteresis-heading">Hysteresis</h2>
+            <p class="hint">A rolling window prevents the overlay from flickering on single-frame results.</p>
+          </div>
+        </div>
+
+        <div class="hysteresis-grid">
+          <div class="field">
+            <div class="field-head">
+              <label for="hysteresis-window">Window</label>
+              <output id="hysteresis-window-value" for="hysteresis-window">5</output>
+            </div>
+            <input id="hysteresis-window" type="range" min="3" max="9" step="1" value="5" />
+          </div>
+          <div class="field">
+            <div class="field-head">
+              <label for="show-threshold">Show threshold</label>
+              <output id="show-threshold-value" for="show-threshold">3</output>
+            </div>
+            <input id="show-threshold" type="range" min="1" max="9" step="1" value="3" />
+          </div>
+          <div class="field">
+            <div class="field-head">
+              <label for="hide-threshold">Hide threshold</label>
+              <output id="hide-threshold-value" for="hide-threshold">2</output>
+            </div>
+            <input id="hide-threshold" type="range" min="1" max="9" step="1" value="2" />
+          </div>
+        </div>
+        <p id="hysteresis-summary" class="summary-line"></p>
+      </section>
+
+      <section class="card" aria-labelledby="overlay-heading">
+        <div class="card-head">
+          <div>
+            <h2 id="overlay-heading">Overlay</h2>
+            <p class="hint">Choose what covers the screen when sensitive content is detected.</p>
+          </div>
+        </div>
+
+        <fieldset class="fieldset">
+          <legend>Overlay mode</legend>
+          <div class="segmented">
+            <label class="segment">
+              <input type="radio" name="overlay-mode" value="blur" checked />
+              <span>Frosted blur</span>
+            </label>
+            <label class="segment">
+              <input type="radio" name="overlay-mode" value="gif" />
+              <span>GIF / image</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend>Coverage</legend>
+          <div class="segmented">
+            <label class="segment">
+              <input type="radio" name="overlay-coverage" value="detected" checked />
+              <span>Detected area</span>
+            </label>
+            <label class="segment">
+              <input type="radio" name="overlay-coverage" value="full" />
+              <span>Full screen</span>
+            </label>
+          </div>
+          <p class="hint">
+            Detected area follows the engine's boxes and leaves the rest of the screen visible.
+            It falls back to full screen when the detector has no boxes.
+          </p>
+        </fieldset>
+
+        <div id="gif-row" class="field gif-row" hidden>
+          <div class="field-head">
+            <label for="gif-path">Overlay image</label>
+            <span id="gif-path" class="path-label">No image selected</span>
+          </div>
+          <div class="button-row">
+            <button id="btn-choose-gif" type="button" class="button secondary">Choose file…</button>
+            <button id="btn-clear-gif" type="button" class="button ghost">Clear</button>
+          </div>
+          <p class="hint">If no file is selected, an animated placeholder is shown instead.</p>
+        </div>
+
+        <div class="toggle-list">
+          <label class="toggle">
+            <input id="launch-at-login" type="checkbox" />
+            <span class="toggle-copy">
+              <strong>Launch at login</strong>
+              <span class="hint">Start ScreenBlur in the background when you sign in.</span>
+            </span>
+          </label>
+          <label class="toggle">
+            <input id="auto-start" type="checkbox" checked />
+            <span class="toggle-copy">
+              <strong>Start monitoring on launch</strong>
+              <span class="hint">Launch the local engine and begin capture automatically.</span>
+            </span>
+          </label>
+          <label class="toggle">
+            <input id="start-paused" type="checkbox" />
+            <span class="toggle-copy">
+              <strong>Start paused</strong>
+              <span class="hint">Keep the engine warm but wait for you to resume monitoring.</span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card logs-card" aria-labelledby="logs-heading">
+        <div class="card-head">
+          <div>
+            <h2 id="logs-heading">Logs</h2>
+            <p class="hint">
+              Last 200 lines, including detector results and overlay decisions. Tokens
+              are redacted; frame data is never logged.
+            </p>
+          </div>
+          <div class="log-actions">
+            <label class="inline-check">
+              <input id="auto-scroll" type="checkbox" checked />
+              <span>Auto-scroll</span>
+            </label>
+            <button id="btn-refresh-logs" type="button" class="button ghost">Refresh</button>
+          </div>
+        </div>
+        <pre id="logs" class="logs" tabindex="0" aria-label="Application log">Loading logs…</pre>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <span>ScreenBlur is a local tool. Overlay coverage is best effort — some protected fullscreen surfaces cannot be covered.</span>
+    </footer>
+
+    <script type="module" src="./renderer.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+# Optional real inference backend. Install only on platforms/Python versions
+# that publish onnxruntime wheels (see engine/models/README.md).
+#
+# The engine intentionally imports onnxruntime lazily so it still starts and
+# falls back to the heuristic detector when this extra is unavailable.
+-r requirements.txt
+onnxruntime>=1.20

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data: blob:; media-src 'self' file: data:; connect-src 'self' ws://127.0.0.1:5173 http://127.0.0.1:5173; font-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ScreenBlur overlay</title>
+    <link rel="stylesheet" href="./overlay.css" />
+  </head>
+  <body>
+    <div id="overlay" class="overlay" aria-hidden="true">
+      <div id="region" class="region">
+        <div id="blur-layer" class="layer blur-layer" hidden>
+          <div class="aurora aurora-a"></div>
+          <div class="aurora aurora-b"></div>
+          <div class="frost"></div>
+          <div class="noise"></div>
+          <div class="scanlines"></div>
+        </div>
+
+        <div id="gif-layer" class="layer gif-layer" hidden>
+          <img id="gif-image" class="gif-image" alt="" hidden />
+          <div id="gif-placeholder" class="gif-placeholder">
+            <div class="placeholder-glow"></div>
+            <div class="placeholder-shield" aria-hidden="true">
+              <svg viewBox="0 0 64 64" width="64" height="64" role="presentation">
+                <path
+                  d="M32 6 54 15v15c0 13-9 23-22 28C19 53 10 43 10 30V15Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                  stroke-linejoin="round"
+                />
+                <path d="M22 32l7 7 14-15" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <p class="placeholder-text">Content hidden</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="badge">
+        <span class="badge-dot" aria-hidden="true"></span>
+        <span id="badge-title">Content hidden</span>
+        <span id="badge-score" class="badge-score"></span>
+      </div>
+    </div>
+
+    <script type="module" src="./overlay.ts"></script>
+  </body>
+</html>

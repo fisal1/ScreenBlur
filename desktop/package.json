@@ -1,0 +1,43 @@
+{
+  "name": "screenblur-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ScreenBlur desktop app: local screen-content moderation with an on-device engine",
+  "author": "ScreenBlur",
+  "license": "MIT",
+  "main": "dist-electron/main/index.js",
+  "scripts": {
+    "dev": "concurrently -k -n vite,tsc,electron -c cyan,magenta,yellow \"npm:dev:vite\" \"npm:dev:tsc\" \"npm:dev:electron\"",
+    "dev:vite": "vite",
+    "dev:tsc": "tsc -p tsconfig.node.json --watch --preserveWatchOutput",
+    "dev:electron": "wait-on tcp:127.0.0.1:5173 dist-electron/main/index.js && cross-env SCREENBLUR_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
+    "build": "tsc -p tsconfig.node.json && vite build",
+    "start": "npm run build && electron .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.json --noEmit",
+    "package": "npm run build && electron-builder",
+    "package:dir": "npm run build && electron-builder --dir"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/ws": "^8.5.13",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.0",
+    "vitest": "^2.1.4",
+    "wait-on": "^8.0.1"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.21.5": true,
+    "fsevents@2.3.3": true
+  }
+}
