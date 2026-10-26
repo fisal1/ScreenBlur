@@ -25,8 +25,10 @@ pip install -r requirements-dev.txt
 # Optional: real inference (skip on Python versions without onnxruntime wheels)
 pip install -r requirements-onnx.txt
 
-# Put a classifier at engine/models/nsfw.onnx (see engine/models/README.md),
-# or run without one to use the dev heuristic detector.
+# Optional: install the box-capable NudeNet 320n detector.
+python3 ../scripts/fetch_nudenet_model.py
+
+# Models are auto-detected in engine/models/. Without one, the dev heuristic runs.
 python -m app.main --port 8000
 ```
 
@@ -71,6 +73,9 @@ npm run dev
 - Overlay windows use OS content protection so the capture loop reads the screen
   underneath them, not the overlay. The Settings log panel shows one line per
   detector result, engine output, and each overlay show/hide decision.
+- With NudeNet installed, the engine reports `nudenet:<model>` and returns one
+  normalized box per exposed body part. The overlay merges only overlapping boxes,
+  so separate people/regions stay separate instead of becoming one full-screen cover.
 - With no ONNX model the engine reports `detector: "heuristic"` and uses a skin-tone
   heuristic. It exists only to exercise the pipeline; it is not a real NSFW classifier.
 

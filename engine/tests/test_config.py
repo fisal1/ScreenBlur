@@ -36,6 +36,7 @@ def test_settings_from_env() -> None:
             "SCREENBLUR_PORT": "8123",
             "SCREENBLUR_TOKEN": "from-env",
             "SCREENBLUR_MODEL_PATH": "/tmp/model.onnx",
+            "SCREENBLUR_MODEL_KIND": "NUDENET",
             "SCREENBLUR_MODEL_INPUT_SIZE": "320",
             "SCREENBLUR_EXPLICIT_CLASS_INDEX": "2",
             "SCREENBLUR_SENSITIVITY": "0.7",
@@ -49,6 +50,7 @@ def test_settings_from_env() -> None:
     assert settings.port == 8123
     assert settings.token == "from-env"
     assert settings.model_path == Path("/tmp/model.onnx")
+    assert settings.model_kind == "nudenet"
     assert settings.model_input_size == 320
     assert settings.explicit_class_index == 2
     assert settings.sensitivity == pytest.approx(0.7)
@@ -63,6 +65,7 @@ def test_settings_defaults() -> None:
     assert settings.host == "127.0.0.1"
     assert settings.port == 0
     assert settings.token is None
+    assert settings.model_kind == "auto"
     assert settings.sensitivity == pytest.approx(0.8)
     assert settings.max_frame_bytes == 8 * 1024 * 1024
     assert settings.log_level == "info"
@@ -78,6 +81,7 @@ def test_settings_defaults() -> None:
         {"SCREENBLUR_FPS": "0"},
         {"SCREENBLUR_MAX_FRAME_BYTES": "10"},
         {"SCREENBLUR_MODEL_INPUT_SIZE": "8"},
+        {"SCREENBLUR_MODEL_KIND": "yolo"},
         {"SCREENBLUR_LOG_LEVEL": "verbose"},
         {"SCREENBLUR_PORT": "not-a-number"},
     ],

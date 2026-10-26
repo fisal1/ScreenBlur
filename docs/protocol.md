@@ -55,9 +55,10 @@ desktop app still filters results by ascending sequence number; superseded resul
 diagnostic only.
 
 `boxes` entries are normalized `[x1, y1, x2, y2]` rectangles in the range 0..1,
-relative to the captured frame. The desktop app uses their union to place the
-detected-area overlay. An empty list falls back to a full-screen cover. `roi` is reserved
-for future detector-region metadata and is currently `null`.
+relative to the captured frame. The desktop app places one overlay region per
+non-overlapping box and merges overlapping/near-touching boxes. An empty list falls
+back to a full-screen cover. `roi` is reserved for future detector-region metadata and
+is currently `null`.
 
 ## Frame scheduling
 

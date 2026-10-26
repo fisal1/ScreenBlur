@@ -48,4 +48,7 @@ device.
 - Screen capture itself requires OS permission. On macOS the app cannot capture until
   Screen Recording is granted, and the app must be restarted afterwards.
 - The bundled heuristic detector is for pipeline development only. Use a vetted ONNX
-  classifier for real detection and evaluate its accuracy and false-positive rate.
+  detector/classifier for real detection and evaluate its accuracy and false-positive
+  rate. NudeNet (320n/640m) is supported as an opt-in box detector; its weights are
+  not bundled. NudeNet's repository is AGPL-3.0, so review the licence before
+  redistributing an engine that contains its weights.

@@ -48,7 +48,13 @@ def build_parser(settings: Settings) -> argparse.ArgumentParser:
         "--model",
         type=Path,
         default=settings.model_path,
-        help="path to an ONNX classifier (default: models/nsfw.onnx)",
+        help="path to an ONNX classifier or NudeNet detector (default: models/nsfw.onnx)",
+    )
+    parser.add_argument(
+        "--model-kind",
+        choices=("auto", "classifier", "nudenet"),
+        default=settings.model_kind,
+        help="detector adapter; auto uses the filename (default: %(default)s)",
     )
     parser.add_argument(
         "--model-input-size",
@@ -141,6 +147,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         port=args.port,
         token=args.token if args.token is not None else env_settings.token,
         model_path=args.model,
+        model_kind=args.model_kind,
         model_input_size=args.model_input_size,
         explicit_class_index=args.explicit_class_index,
         sensitivity=args.sensitivity,

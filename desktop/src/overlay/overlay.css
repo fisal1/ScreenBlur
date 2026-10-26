@@ -34,12 +34,21 @@ body {
   opacity: 1;
 }
 
-/* The detector's normalized box is converted to percentages on this element.
-   Full-screen fallback leaves it at inset: 0; a partial region gets rounded
-   corners and lets the rest of the desktop stay visible. */
-.region {
+/* The detector's normalized boxes are converted to percentages on these
+   elements. The full-screen fallback uses one region at 0/0/100%/100%; partial
+   regions get rounded corners and let the rest of the desktop stay visible. */
+.regions {
   position: absolute;
   inset: 0;
+  overflow: hidden;
+}
+
+.region {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   transition:
     left 160ms ease,

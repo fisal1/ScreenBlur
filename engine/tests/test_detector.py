@@ -12,9 +12,12 @@ from app.detector import (
     DetectorError,
     HeuristicDetector,
     ImageDecodeError,
+    NudeNetDetector,
     OnnxClassifierDetector,
+    _postprocess_nudenet,
     _score_from_logits,
     load_detector,
+    resolve_detector_kind,
 )
 
 
@@ -94,6 +97,140 @@ def test_onnx_detector_is_lazy(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     detector = OnnxClassifierDetector(tmp_path / "missing.onnx")
     assert detector.is_loaded is False
     assert detector.id == "onnx:missing"
+
+
+def test_auto_detector_kind_from_filename() -> None:
+    assert resolve_detector_kind("auto", Path("nudenet-320n.onnx")) == "nudenet"
+    assert resolve_detector_kind("auto", Path("640m.onnx")) == "nudenet"
+    assert resolve_detector_kind("auto", Path("nsfw.onnx")) == "classifier"
+    assert resolve_detector_kind("classifier", Path("nudenet.onnx")) == "classifier"
+    assert resolve_detector_kind("nudenet", Path("renamed.onnx")) == "nudenet"
+
+
+def test_nudenet_detector_is_lazy(tmp_path: Path) -> None:
+    detector = NudeNetDetector(tmp_path / "nudenet-320n.onnx")
+    assert detector.is_loaded is False
+    assert detector.id == "nudenet:nudenet-320n"
+
+
+def _nudenet_output(rows: list[list[float]]) -> np.ndarray:
+    output = np.zeros((1, 22, len(rows)), dtype=np.float32)
+    for column, row in enumerate(rows):
+        output[0, :, column] = np.asarray(row, dtype=np.float32)
+    return output
+
+
+def _nudenet_row(
+    *,
+    center_x: float,
+    center_y: float,
+    width: float,
+    height: float,
+    class_id: int,
+    score: float,
+) -> list[float]:
+    row = [center_x, center_y, width, height] + [0.0] * 18
+    row[4 + class_id] = score
+    return row
+
+
+def test_nudenet_postprocess_maps_and_normalizes_box() -> None:
+    output = _nudenet_output(
+        [
+            _nudenet_row(
+                center_x=160,
+                center_y=80,
+                width=64,
+                height=64,
+                class_id=4,
+                score=0.9,
+            )
+        ]
+    )
+    detections = _postprocess_nudenet(
+        output,
+        original_width=200,
+        original_height=100,
+        padded_size=200,
+        input_width=320,
+        input_height=320,
+    )
+    assert len(detections) == 1
+    box, score, class_id = detections[0]
+    assert score == pytest.approx(0.9)
+    assert class_id == 4
+    assert box == pytest.approx([0.4, 0.3, 0.6, 0.7])
+
+
+def test_nudenet_postprocess_ignores_covered_classes() -> None:
+    output = _nudenet_output(
+        [
+            _nudenet_row(
+                center_x=160,
+                center_y=80,
+                width=64,
+                height=64,
+                class_id=0,
+                score=0.99,
+            )
+        ]
+    )
+    assert (
+        _postprocess_nudenet(
+            output,
+            original_width=320,
+            original_height=320,
+            padded_size=320,
+            input_width=320,
+            input_height=320,
+        )
+        == []
+    )
+
+
+def test_nudenet_postprocess_applies_nms() -> None:
+    output = _nudenet_output(
+        [
+            _nudenet_row(
+                center_x=160,
+                center_y=160,
+                width=100,
+                height=100,
+                class_id=3,
+                score=0.9,
+            ),
+            _nudenet_row(
+                center_x=165,
+                center_y=160,
+                width=100,
+                height=100,
+                class_id=3,
+                score=0.8,
+            ),
+        ]
+    )
+    detections = _postprocess_nudenet(
+        output,
+        original_width=320,
+        original_height=320,
+        padded_size=320,
+        input_width=320,
+        input_height=320,
+    )
+    assert len(detections) == 1
+    assert detections[0][1] == pytest.approx(0.9)
+
+
+def test_nudenet_postprocess_rejects_wrong_column_count() -> None:
+    with pytest.raises(DetectorError):
+        _postprocess_nudenet(
+            np.zeros((1, 21, 1), dtype=np.float32),
+            original_width=320,
+            original_height=320,
+            padded_size=320,
+            input_width=320,
+            input_height=320,
+        )
 
 
 def test_single_logit_sigmoid() -> None:

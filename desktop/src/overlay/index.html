@@ -12,8 +12,18 @@
   </head>
   <body>
     <div id="overlay" class="overlay" aria-hidden="true">
-      <div id="region" class="region">
-        <div id="blur-layer" class="layer blur-layer" hidden>
+      <div id="regions" class="regions"></div>
+
+      <div class="badge">
+        <span class="badge-dot" aria-hidden="true"></span>
+        <span id="badge-title">Content hidden</span>
+        <span id="badge-score" class="badge-score"></span>
+      </div>
+    </div>
+
+    <template id="region-template">
+      <div class="region">
+        <div class="layer blur-layer" hidden>
           <div class="aurora aurora-a"></div>
           <div class="aurora aurora-b"></div>
           <div class="frost"></div>
@@ -21,9 +31,9 @@
           <div class="scanlines"></div>
         </div>
 
-        <div id="gif-layer" class="layer gif-layer" hidden>
-          <img id="gif-image" class="gif-image" alt="" hidden />
-          <div id="gif-placeholder" class="gif-placeholder">
+        <div class="layer gif-layer" hidden>
+          <img class="gif-image" alt="" hidden />
+          <div class="gif-placeholder">
             <div class="placeholder-glow"></div>
             <div class="placeholder-shield" aria-hidden="true">
               <svg viewBox="0 0 64 64" width="64" height="64" role="presentation">
@@ -41,13 +51,7 @@
           </div>
         </div>
       </div>
-
-      <div class="badge">
-        <span class="badge-dot" aria-hidden="true"></span>
-        <span id="badge-title">Content hidden</span>
-        <span id="badge-score" class="badge-score"></span>
-      </div>
-    </div>
+    </template>
 
     <script type="module" src="./overlay.ts"></script>
   </body>

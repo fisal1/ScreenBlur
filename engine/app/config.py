@@ -17,6 +17,14 @@ from pathlib import Path
 from .protocol import DEFAULT_MAX_FRAME_BYTES, HEADER_SIZE, PROTOCOL_VERSION
 
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+MODEL_KINDS = frozenset({"auto", "classifier", "nudenet"})
+_MODEL_FILENAMES = (
+    "nsfw.onnx",
+    "nudenet-320n.onnx",
+    "nudenet.onnx",
+    "320n.onnx",
+    "640m.onnx",
+)
 _LOG_FORMAT = "%(asctime)s %(levelname)-8s %(name)s: %(message)s"
 _TOKEN_RE = re.compile(r"(?i)(token=)[^\s&\"']+")
 _BEARER_RE = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+")
@@ -42,23 +50,28 @@ class _RedactingFormatter(logging.Formatter):
 def default_model_path() -> Path:
     """Return the conventional ONNX model location.
 
-    Supports both a source checkout (``engine/models/nsfw.onnx``) and a
-    PyInstaller one-file build (bundled data in ``sys._MEIPASS``, or a model
-    dropped next to the executable).
+    Supports both a source checkout (``engine/models/``) and a PyInstaller
+    one-file build (bundled data in ``sys._MEIPASS``, or a model dropped next
+    to the executable). The first existing model wins; NudeNet filenames are
+    discovered automatically so installing ``nudenet-320n.onnx`` is enough to
+    opt into the box detector.
     """
 
-    source_default = Path(__file__).resolve().parents[1] / "models" / "nsfw.onnx"
-    candidates: list[Path] = []
+    source_dir = Path(__file__).resolve().parents[1] / "models"
+    search_dirs: list[Path] = []
     if getattr(sys, "frozen", False):
         meipass = getattr(sys, "_MEIPASS", None)
         if meipass:
-            candidates.append(Path(meipass) / "models" / "nsfw.onnx")
-        candidates.append(Path(sys.executable).resolve().parent / "models" / "nsfw.onnx")
-    candidates.append(source_default)
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate
-    return candidates[0]
+            search_dirs.append(Path(meipass) / "models")
+        search_dirs.append(Path(sys.executable).resolve().parent / "models")
+    search_dirs.append(source_dir)
+
+    for directory in search_dirs:
+        for filename in _MODEL_FILENAMES:
+            candidate = directory / filename
+            if candidate.is_file():
+                return candidate
+    return search_dirs[0] / _MODEL_FILENAMES[0]
 
 
 def generate_token() -> str:
@@ -100,6 +113,7 @@ class Settings:
     port: int = 0
     token: str | None = None
     model_path: Path = field(default_factory=default_model_path)
+    model_kind: str = "auto"
     model_input_size: int = 224
     explicit_class_index: int = 1
     sensitivity: float = 0.8
@@ -116,6 +130,8 @@ class Settings:
             raise ValueError("port must be between 0 and 65535")
         if self.token is not None and not self.token:
             raise ValueError("token must not be empty when supplied")
+        if self.model_kind.lower() not in MODEL_KINDS:
+            raise ValueError("model kind must be auto, classifier, or nudenet")
         if not 32 <= self.model_input_size <= 4096:
             raise ValueError("model input size must be between 32 and 4096")
         if not 0 <= self.explicit_class_index <= 4096:
@@ -144,6 +160,7 @@ class Settings:
             port=port,
             token=token,
             model_path=model_path,
+            model_kind=values.get("SCREENBLUR_MODEL_KIND", "auto").strip().lower() or "auto",
             model_input_size=_env_int(values, "SCREENBLUR_MODEL_INPUT_SIZE", 224),
             explicit_class_index=_env_int(values, "SCREENBLUR_EXPLICIT_CLASS_INDEX", 1),
             sensitivity=_env_float(values, "SCREENBLUR_SENSITIVITY", 0.8),

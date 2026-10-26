@@ -1,8 +1,9 @@
 # ScreenBlur engine
 
 Local-only Python sidecar for [ScreenBlur](../README.md). It accepts JPEG frames
-from the Electron app over a WebSocket, runs a classifier, and returns a
-show/hide decision. Frames never leave the machine and are not written to disk.
+from the Electron app over a WebSocket, runs a detector/classifier, and returns
+a show/hide decision with optional normalized boxes. Frames never leave the
+machine and are not written to disk.
 
 - Endpoint: `ws://127.0.0.1:<port>/ws/stream?token=<token>`
 - Health: `GET http://127.0.0.1:<port>/health`
@@ -58,9 +59,10 @@ engine generated the token. The file is written atomically after binding.
 | `SCREENBLUR_HOST` | `127.0.0.1` | Loopback bind address (`127.0.0.1`, `::1`, `localhost`) |
 | `SCREENBLUR_PORT` | `0` | TCP port; `0` selects a free port |
 | `SCREENBLUR_TOKEN` | auto-generated | Per-launch bearer token |
-| `SCREENBLUR_MODEL_PATH` | `models/nsfw.onnx` | ONNX classifier path |
-| `SCREENBLUR_MODEL_INPUT_SIZE` | `224` | Square input size (overridden by static model dimensions) |
-| `SCREENBLUR_EXPLICIT_CLASS_INDEX` | `1` | Output index for the explicit class |
+| `SCREENBLUR_MODEL_PATH` | `models/nsfw.onnx`, then NudeNet names | ONNX model path |
+| `SCREENBLUR_MODEL_KIND` | `auto` | `auto`, `classifier`, or `nudenet` |
+| `SCREENBLUR_MODEL_INPUT_SIZE` | `224` | Classifier square input size (static model dimensions win) |
+| `SCREENBLUR_EXPLICIT_CLASS_INDEX` | `1` | Classifier output index for the explicit class |
 | `SCREENBLUR_SENSITIVITY` | `0.8` | Minimum score for `show: true` |
 | `SCREENBLUR_FPS` | `2` | Advisory capture FPS echoed in `status` |
 | `SCREENBLUR_MAX_FRAME_BYTES` | `8388608` (8 MiB) | Maximum binary WebSocket message |
@@ -68,15 +70,30 @@ engine generated the token. The file is written atomically after binding.
 | `SCREENBLUR_READY_FILE` | unset | Optional startup handshake file |
 
 CLI flags mirror the settings: `--host`, `--port`, `--token`, `--model`,
-`--model-input-size`, `--explicit-class-index`, `--sensitivity`, `--fps`,
-`--max-frame-bytes`, `--log-level`, `--ready-file`.
+`--model-kind`, `--model-input-size`, `--explicit-class-index`, `--sensitivity`,
+`--fps`, `--max-frame-bytes`, `--log-level`, `--ready-file`.
 
 ## Detectors
 
-At startup the engine loads `models/nsfw.onnx` when it exists. If the file is
-missing, ONNX Runtime is unavailable, or the model fails to load, the engine
-**still starts** and reports the `heuristic` fallback. The reason is included in
-`ready`, `status`, and `/health` as `detector_error`.
+At startup the engine looks for an ONNX model in this order:
+`models/nsfw.onnx`, `models/nudenet-320n.onnx`, `models/nudenet.onnx`,
+`models/320n.onnx`, `models/640m.onnx`. If the file is missing, ONNX Runtime is
+unavailable, or the model fails to load, the engine **still starts** and reports
+the `heuristic` fallback. The reason is included in `ready`, `status`, and
+`/health` as `detector_error`.
+
+Two ONNX adapters are supported:
+
+- **NudeNet v3** — YOLOv8-based body-part detector. It returns normalized
+  bounding boxes for exposed body parts, which the desktop app can blur
+  individually. Use `python3 scripts/fetch_nudenet_model.py` to install 320n,
+  or point `SCREENBLUR_MODEL_PATH` at a 320n/640m ONNX file.
+- **Classifier** — whole-image NSFW classifier with a score and no boxes. It
+  falls back to a full-screen cover when detected-area coverage is selected.
+
+Auto-selection uses the filename: names containing `nudenet`/`yolo`, or exactly
+`320n.onnx`/`640m.onnx`, use NudeNet. Override with
+`SCREENBLUR_MODEL_KIND=classifier|nudenet`.
 
 The heuristic detector uses a skin-tone ratio and returns one coarse normalized
 bounding box for the detected skin-tone region, which lets the desktop app place
@@ -210,7 +227,7 @@ The output is `engine/dist/screenblur-engine`. The script:
 | `app/config.py` | Environment/CLI settings, loopback helpers, live runtime config |
 | `app/protocol.py` | 24-byte frame header, validation, control JSON parsing |
 | `app/scheduler.py` | Single-worker latest-frame scheduler and stats |
-| `app/detector.py` | Detector protocol, ONNX classifier, heuristic fallback |
+| `app/detector.py` | Detector protocol, NudeNet/ONNX classifier, heuristic fallback |
 | `app/ws.py` | FastAPI app, auth/host checks, receive loop, sender queue |
 | `app/main.py` | Socket binding, startup announcements, Uvicorn lifecycle |
 | `run_engine.py` | PyInstaller entrypoint |
