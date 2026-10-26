@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import type { AppConfig, OverlayCoverage, OverlayMode } from '../shared/types';
 
 export const DEFAULT_CONFIG: Readonly<AppConfig> = Object.freeze({
-  sensitivity: 0.8,
+  sensitivity: 0.35,
   fps: 2,
   jpegQuality: 75,
   maxWidth: 1280,
@@ -65,7 +65,7 @@ export function sanitizeConfig(input: unknown, base: Readonly<AppConfig> = DEFAU
   }
 
   return {
-    sensitivity: clampNumber(record.sensitivity, 0.5, 0.95, base.sensitivity),
+    sensitivity: clampNumber(record.sensitivity, 0.1, 0.95, base.sensitivity),
     fps: clampInt(record.fps, 1, 5, base.fps),
     jpegQuality: clampInt(record.jpegQuality, 50, 95, base.jpegQuality),
     maxWidth: clampInt(record.maxWidth, 320, 3840, base.maxWidth),

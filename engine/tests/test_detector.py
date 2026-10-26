@@ -14,6 +14,7 @@ from app.detector import (
     ImageDecodeError,
     NudeNetDetector,
     OnnxClassifierDetector,
+    _default_nudenet_input_size,
     _postprocess_nudenet,
     _score_from_logits,
     load_detector,
@@ -111,6 +112,12 @@ def test_nudenet_detector_is_lazy(tmp_path: Path) -> None:
     detector = NudeNetDetector(tmp_path / "nudenet-320n.onnx")
     assert detector.is_loaded is False
     assert detector.id == "nudenet:nudenet-320n"
+
+
+def test_nudenet_input_size_compensates_for_widescreen_padding() -> None:
+    assert _default_nudenet_input_size(Path("nudenet-320n.onnx")) == 576
+    assert _default_nudenet_input_size(Path("nudenet.onnx")) == 576
+    assert _default_nudenet_input_size(Path("640m.onnx")) == 640
 
 
 def _nudenet_output(rows: list[list[float]]) -> np.ndarray:

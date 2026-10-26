@@ -116,7 +116,7 @@ class Settings:
     model_kind: str = "auto"
     model_input_size: int = 224
     explicit_class_index: int = 1
-    sensitivity: float = 0.8
+    sensitivity: float = 0.35
     fps: float = 2.0
     max_frame_bytes: int = DEFAULT_MAX_FRAME_BYTES
     log_level: str = "info"
@@ -163,7 +163,7 @@ class Settings:
             model_kind=values.get("SCREENBLUR_MODEL_KIND", "auto").strip().lower() or "auto",
             model_input_size=_env_int(values, "SCREENBLUR_MODEL_INPUT_SIZE", 224),
             explicit_class_index=_env_int(values, "SCREENBLUR_EXPLICIT_CLASS_INDEX", 1),
-            sensitivity=_env_float(values, "SCREENBLUR_SENSITIVITY", 0.8),
+            sensitivity=_env_float(values, "SCREENBLUR_SENSITIVITY", 0.35),
             fps=_env_float(values, "SCREENBLUR_FPS", 2.0),
             max_frame_bytes=_env_int(values, "SCREENBLUR_MAX_FRAME_BYTES", DEFAULT_MAX_FRAME_BYTES),
             log_level=values.get("SCREENBLUR_LOG_LEVEL", "info").strip().lower() or "info",
@@ -211,7 +211,7 @@ def _env_path(values: Mapping[str, str], name: str) -> Path | None:
 class RuntimeSnapshot:
     """A consistent snapshot of live, client-adjustable settings."""
 
-    sensitivity: float = 0.8
+    sensitivity: float = 0.35
     fps: float = 2.0
     paused: bool = False
 
@@ -232,7 +232,9 @@ class RuntimeConfig:
 
     __slots__ = ("_fps", "_lock", "_paused", "_sensitivity")
 
-    def __init__(self, *, sensitivity: float = 0.8, fps: float = 2.0, paused: bool = False) -> None:
+    def __init__(
+        self, *, sensitivity: float = 0.35, fps: float = 2.0, paused: bool = False
+    ) -> None:
         self._lock = threading.Lock()
         self._sensitivity = float(sensitivity)
         self._fps = float(fps)

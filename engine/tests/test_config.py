@@ -66,7 +66,7 @@ def test_settings_defaults() -> None:
     assert settings.port == 0
     assert settings.token is None
     assert settings.model_kind == "auto"
-    assert settings.sensitivity == pytest.approx(0.8)
+    assert settings.sensitivity == pytest.approx(0.35)
     assert settings.max_frame_bytes == 8 * 1024 * 1024
     assert settings.log_level == "info"
 

@@ -9,7 +9,7 @@ export type OverlayMode = 'gif' | 'blur';
 export type OverlayCoverage = 'detected' | 'full';
 
 export interface AppConfig {
-  /** Minimum engine score at which a frame is considered sensitive (0.5 - 0.95). */
+  /** Confidence threshold for a sensitive frame (0.1 - 0.95; higher is stricter). */
   sensitivity: number;
   /** Target capture rate in frames per second (1 - 5). */
   fps: number;

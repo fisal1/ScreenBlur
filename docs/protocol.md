@@ -31,7 +31,7 @@ and is configurable with `SCREENBLUR_MAX_FRAME_BYTES`.
 ```json
 { "type": "pause" }
 { "type": "resume" }
-{ "type": "config", "sensitivity": 0.8, "fps": 2 }
+{ "type": "config", "sensitivity": 0.35, "fps": 2 }
 { "type": "reload_model" }
 { "type": "ping", "id": 1 }
 ```
@@ -45,7 +45,7 @@ types produce an `error` response.
 ```json
 { "type": "ready", "version": "0.1.0", "protocol": 1, "models": ["heuristic"], "detector": "heuristic" }
 { "type": "result", "seq": 42, "display_id": 1, "show": true, "score": 0.91, "category": "explicit", "boxes": [[0.12, 0.18, 0.56, 0.92]], "roi": null, "latency_ms": 42, "processing_ms": 30, "superseded": false }
-{ "type": "status", "paused": false, "sensitivity": 0.8, "fps": 2, "detector": "heuristic" }
+{ "type": "status", "paused": false, "sensitivity": 0.35, "fps": 2, "detector": "heuristic" }
 { "type": "pong", "id": 1 }
 { "type": "error", "code": "MODEL_NOT_LOADED", "message": "..." }
 ```

@@ -136,17 +136,17 @@
         <div class="card-head">
           <div>
             <h2 id="detection-heading">Detection</h2>
-            <p class="hint">Higher sensitivity means the engine needs more confidence before hiding content.</p>
+            <p class="hint">Lower thresholds blur more content; higher thresholds require stronger detector confidence.</p>
           </div>
         </div>
 
         <div class="field">
           <div class="field-head">
-            <label for="sensitivity">Sensitivity</label>
-            <output id="sensitivity-value" for="sensitivity">0.80</output>
+            <label for="sensitivity">Confidence threshold</label>
+            <output id="sensitivity-value" for="sensitivity">0.35</output>
           </div>
-          <input id="sensitivity" type="range" min="0.5" max="0.95" step="0.05" value="0.8" />
-          <p class="hint">Minimum score for a frame to count as sensitive.</p>
+          <input id="sensitivity" type="range" min="0.1" max="0.95" step="0.05" value="0.35" />
+          <p class="hint">Minimum score for a frame to count as sensitive. NudeNet scores are often lower than a whole-image classifier; start near 0.35.</p>
         </div>
 
         <div class="field-grid">

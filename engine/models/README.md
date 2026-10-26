@@ -45,8 +45,11 @@ engine/models/640m.onnx
 - Color order: RGB, scaled to `[0, 1]`, no ImageNet normalization.
 - Preprocessing: the frame is padded to a square at the bottom/right, then
   resized to the model input. This matches NudeNet's upstream preprocessing.
-- Input size: `320` for `320n`, `640` for `640m`. A static model input shape
-  wins when the ONNX file declares one.
+- Input size: `576` for `320n`, `640` for `640m`. The 320n weights are
+  natively 320px, but a widescreen frame padded to a square uses only about
+  65% of the input height at 320px. Running at 576px keeps full-screen body
+  parts large enough to detect without making CPU inference too slow. A static
+  model input shape wins when the ONNX file declares one.
 - Output: YOLOv8 rows with `4 + 18` columns: center-x, center-y, width,
   height, followed by the 18 class scores.
 - Explicit classes used for `show` and boxes:

@@ -50,6 +50,12 @@ NUDENET_LABELS = (
 NUDENET_EXPLICIT_CLASS_IDS = frozenset({2, 3, 4, 6, 14})
 _NUDENET_SCORE_THRESHOLD = 0.25
 _NUDENET_IOU_THRESHOLD = 0.45
+# The 320n weights are trained at 320, but desktop frames are widescreen and
+# NudeNet pads them to a square before inference. At 320 input a 16:10 display
+# only uses ~65% of the input height, which makes full-screen body parts vanish.
+# 576 is still fast on CPU and keeps the padded content large enough to detect.
+_NUDENET_320N_INPUT_SIZE = 576
+_NUDENET_640M_INPUT_SIZE = 640
 
 
 class DetectorError(RuntimeError):
@@ -203,6 +209,9 @@ class NudeNetDetector:
     upstream detector), resized to the model input, and the decoded YOLO boxes
     are mapped back to normalized frame coordinates. Only exposed body-part
     labels can trigger a detection; covered and non-explicit labels are ignored.
+
+    The input size defaults to 576 for 320n because widescreen padding otherwise
+    removes too much effective resolution. 640m uses its native 640 input.
     """
 
     def __init__(
@@ -492,7 +501,9 @@ def _create_onnx_session(model_path: Path) -> Any:
 
 
 def _default_nudenet_input_size(model_path: Path) -> int:
-    return 640 if "640" in model_path.stem.lower() else 320
+    if "640" in model_path.stem.lower():
+        return _NUDENET_640M_INPUT_SIZE
+    return _NUDENET_320N_INPUT_SIZE
 
 
 def _postprocess_nudenet(

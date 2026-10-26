@@ -127,7 +127,7 @@ Send as binary WebSocket message. Structure:
 ```json
 { "type": "pause" }
 { "type": "resume" }
-{ "type": "config", "sensitivity": 0.8, "fps": 2 }
+{ "type": "config", "sensitivity": 0.35, "fps": 2 }
 { "type": "reload_model", "model_id": "nsfw_v1" }
 ```
 

@@ -76,6 +76,10 @@ npm run dev
 - With NudeNet installed, the engine reports `nudenet:<model>` and returns one
   normalized box per exposed body part. The overlay merges only overlapping boxes,
   so separate people/regions stay separate instead of becoming one full-screen cover.
+  The 320n model runs at a 576px input by default because widescreen padding at
+  320px makes full-screen body parts too small to detect reliably.
+- The detection threshold is under Settings → Detection. Lower values blur more
+  content; 0.35 is a good starting point for NudeNet.
 - With no ONNX model the engine reports `detector: "heuristic"` and uses a skin-tone
   heuristic. It exists only to exercise the pipeline; it is not a real NSFW classifier.
 

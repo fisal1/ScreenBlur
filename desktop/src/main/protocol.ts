@@ -223,7 +223,7 @@ function parseStatus(value: Record<string, unknown>): EngineStatusMessage | null
   return {
     type: 'status',
     paused: value.paused,
-    sensitivity: asFiniteNumber(value.sensitivity, 0.8),
+    sensitivity: asFiniteNumber(value.sensitivity, 0.35),
     fps: asFiniteNumber(value.fps, 2),
     detector: asString(value.detector, 'unknown'),
   };

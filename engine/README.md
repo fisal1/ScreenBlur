@@ -63,7 +63,7 @@ engine generated the token. The file is written atomically after binding.
 | `SCREENBLUR_MODEL_KIND` | `auto` | `auto`, `classifier`, or `nudenet` |
 | `SCREENBLUR_MODEL_INPUT_SIZE` | `224` | Classifier square input size (static model dimensions win) |
 | `SCREENBLUR_EXPLICIT_CLASS_INDEX` | `1` | Classifier output index for the explicit class |
-| `SCREENBLUR_SENSITIVITY` | `0.8` | Minimum score for `show: true` |
+| `SCREENBLUR_SENSITIVITY` | `0.35` | Minimum score for `show: true` |
 | `SCREENBLUR_FPS` | `2` | Advisory capture FPS echoed in `status` |
 | `SCREENBLUR_MAX_FRAME_BYTES` | `8388608` (8 MiB) | Maximum binary WebSocket message |
 | `SCREENBLUR_LOG_LEVEL` | `info` | `debug`, `info`, `warning`, `error`, `critical` |
@@ -87,7 +87,9 @@ Two ONNX adapters are supported:
 - **NudeNet v3** — YOLOv8-based body-part detector. It returns normalized
   bounding boxes for exposed body parts, which the desktop app can blur
   individually. Use `python3 scripts/fetch_nudenet_model.py` to install 320n,
-  or point `SCREENBLUR_MODEL_PATH` at a 320n/640m ONNX file.
+  or point `SCREENBLUR_MODEL_PATH` at a 320n/640m ONNX file. The 320n adapter
+  runs at a 576px input by default; 320px is too small once a widescreen frame
+  is padded to a square. 640m keeps its native 640px input.
 - **Classifier** — whole-image NSFW classifier with a score and no boxes. It
   falls back to a full-screen cover when detected-area coverage is selected.
 
@@ -108,7 +110,7 @@ Electron → engine:
 ```json
 { "type": "pause" }
 { "type": "resume" }
-{ "type": "config", "sensitivity": 0.8, "fps": 2 }
+{ "type": "config", "sensitivity": 0.35, "fps": 2 }
 { "type": "reload_model" }
 { "type": "ping", "id": 1 }
 ```
@@ -160,7 +162,7 @@ result completed. The desktop app should still ignore results with a lower
   "detector": "heuristic",
   "detector_error": null,
   "model_path": ".../models/nsfw.onnx",
-  "sensitivity": 0.8,
+  "sensitivity": 0.35,
   "fps": 2.0,
   "metrics": {
     "received": 10,
