@@ -1,0 +1,59 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+}
+
+.cover {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #e8eef7;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: linear-gradient(135deg, #1d2b64, #1f4e5f, #2c3e50);
+  background-size: 300% 300%;
+  animation: drift 12s ease-in-out infinite;
+}
+
+.orb {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #8fd3f4, #84fab0 60%, transparent 70%);
+  animation: breathe 4s ease-in-out infinite;
+}
+
+h1 {
+  margin: 8px 0 0;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+p {
+  margin: 0;
+  font-size: 15px;
+  opacity: 0.8;
+}
+
+kbd {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  font-family: inherit;
+}
+
+@keyframes drift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.1); opacity: 1; }
+}

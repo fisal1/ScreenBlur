@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'" />
+    <link rel="stylesheet" href="settings.css" />
+    <title>ScreenBlur Settings</title>
+  </head>
+  <body>
+    <main>
+      <h1>Sensitivity</h1>
+
+      <section class="card">
+        <p class="threshold-line">Blur when the score reaches <strong id="threshold-value">30%</strong></p>
+        <input id="threshold-slider" type="range" min="5" max="95" step="1" value="30" aria-label="Blur threshold in percent" />
+        <div class="scale">
+          <span>More blurring</span>
+          <span>Fewer false alarms</span>
+        </div>
+        <div id="presets" class="presets"></div>
+        <p class="hint">The blur goes away once the score drops below <span id="hide-value">15%</span>.</p>
+      </section>
+
+      <section class="card">
+        <div class="meter-header">
+          <span>Current screen score</span>
+          <strong id="score-value">-</strong>
+        </div>
+        <div class="meter" aria-hidden="true">
+          <div id="meter-fill" class="meter-fill"></div>
+          <div id="meter-marker" class="meter-marker"></div>
+        </div>
+        <p id="status" class="hint">Waiting for the first result...</p>
+      </section>
+
+      <p class="footnote">Changes apply immediately and are saved.</p>
+    </main>
+    <script src="settings.js"></script>
+  </body>
+</html>

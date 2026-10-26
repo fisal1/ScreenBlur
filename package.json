@@ -1,0 +1,19 @@
+{
+  "name": "screenblur",
+  "version": "0.1.0",
+  "description": "ScreenBlur POC - detects explicit content on screen and covers it with an overlay. All processing is local.",
+  "main": "src/main/index.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "verbose": "electron . --verbose",
+    "selftest": "electron . --selftest",
+    "test": "node --test \"test/**/*.test.js\"",
+    "fetch-model": "node scripts/fetch-model.js",
+    "postinstall": "node scripts/fetch-model.js"
+  },
+  "dependencies": {
+    "electron": "^45.0.0",
+    "onnxruntime-node": "^1.30.0"
+  }
+}

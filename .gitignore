@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Portable Node.js (downloaded by start.ps1)
+tools/node/
+
+# Model weights (downloaded and checksum-verified by scripts/fetch-model.js)
+models/*.onnx
+models/*.part
+
+# Generated output
+selftest-results.json
+dist/
+out/
+*.tmp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment and secrets
+.env
+.env.*
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store

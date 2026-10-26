@@ -1,0 +1,143 @@
+:root {
+  --bg: #14202e;
+  --card: #1c2b3d;
+  --text: #e8eef7;
+  --muted: #9fb0c4;
+  --accent: #4fc3f7;
+  --safe: #2ecc71;
+  --alert: #e74c3c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  user-select: none;
+}
+
+main {
+  padding: 20px 24px;
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.threshold-line {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.threshold-line strong {
+  color: var(--accent);
+  font-size: 22px;
+}
+
+input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.presets {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.presets button {
+  flex: 1;
+  padding: 8px 4px;
+  border: 1px solid #2f4560;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.presets button:hover {
+  border-color: var(--accent);
+}
+
+.presets button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b1520;
+  font-weight: 600;
+}
+
+.hint {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.meter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.meter-header strong {
+  font-size: 18px;
+}
+
+.meter {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: #0f1823;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  width: 0;
+  background: var(--safe);
+  transition: width 0.2s ease, background-color 0.2s ease;
+}
+
+.meter-fill.over {
+  background: var(--alert);
+}
+
+.meter-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--text);
+  left: 30%;
+}
+
+.footnote {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
