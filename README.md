@@ -32,8 +32,8 @@ Test mode, safe to try without explicit content: faces are treated as targets an
    padded by 20% so small movements don't expose its edges.
 3. Each area is covered with the animated GIF in `assets/patch.gif` (cropped to fit). If that
    file is missing, the area gets a blur instead: a tiny averaged-color grid of what's
-   underneath, drawn scaled up and blurred, so it can't be seen through. The GIF is not in git
-   (third-party content); put any GIF at `assets/patch.gif` to use it.
+   underneath, drawn scaled up and blurred, so it can't be seen through. Replace
+   `assets/patch.gif` with any GIF to change what's shown.
 4. A transparent, click-through window that is excluded from screen capture draws the patches.
 5. Areas are tracked individually: one appears when its score reaches the threshold, follows the
    content while its score stays above half the threshold, and disappears 1.5 s after it was last
@@ -92,7 +92,7 @@ src/
     messages.js           message and IPC channel names
     geometry.js           box helpers (IoU, padding, clamping)
     motion.js             motion prediction shared by the tracker and the overlay
-assets/patch.gif          GIF shown over detected areas (local only, not in git)
+assets/patch.gif          GIF shown over detected areas
 docs/RFC.md               design document
 scripts/fetch-model.js    downloads and verifies the model
 scripts/score-image.js    diagnostic: score an image the way the app would

@@ -8,9 +8,6 @@ tools/node/
 models/*.onnx
 models/*.part
 
-# Patch GIF: third-party content, kept local. Without it, patches fall back to a blur.
-assets/patch.gif
-
 # Generated output
 selftest-results.json
 dist/
