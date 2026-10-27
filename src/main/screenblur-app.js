@@ -2,12 +2,12 @@ const { EventEmitter } = require('node:events');
 const path = require('node:path');
 const { app, screen, powerMonitor } = require('electron');
 const {
-  DecisionEngine,
   SENSITIVITY_PRESETS,
   THRESHOLD_PERCENT_RANGE,
   clampThresholdPercent,
   thresholdsFromPercent,
-} = require('./decision-engine');
+} = require('./sensitivity');
+const { RegionTracker } = require('./region-tracker');
 const { InferenceHost } = require('./inference-host');
 const { CaptureHost } = require('./capture-host');
 const { OverlayManager } = require('./overlay');
@@ -20,7 +20,7 @@ const { registerHotkeys, unregisterHotkeys } = require('./hotkeys');
 const MINUTE_MS = 60_000;
 
 /**
- * Orchestrates capture -> inference -> decision -> overlay, plus user controls.
+ * Orchestrates capture -> inference -> region tracking -> overlay, plus user controls.
  *
  * Events: result(msg) for every inference result (used by the self-test).
  */
@@ -36,7 +36,7 @@ class ScreenBlurApp extends EventEmitter {
     });
     const thresholdPercent = clampThresholdPercent(this.settings.get('thresholdPercent'));
 
-    this.engine = new DecisionEngine(thresholdsFromPercent(thresholdPercent));
+    this.regions = new RegionTracker({ ...config.regionTracking, ...thresholdsFromPercent(thresholdPercent) });
     this.inference = new InferenceHost(config);
     this.capture = new CaptureHost(config);
     this.overlay = new OverlayManager(config);
@@ -53,6 +53,7 @@ class ScreenBlurApp extends EventEmitter {
       ready: false,
       testOverlay: false,
       lastResult: null,
+      backend: null,
       error: null,
     };
   }
@@ -104,7 +105,7 @@ class ScreenBlurApp extends EventEmitter {
     const thresholdPercent = clampThresholdPercent(percent);
     if (thresholdPercent === this.state.thresholdPercent) return;
     this.state.thresholdPercent = thresholdPercent;
-    this.engine.configure(thresholdsFromPercent(thresholdPercent));
+    this.regions.configure(thresholdsFromPercent(thresholdPercent));
     this.settings.set('thresholdPercent', thresholdPercent);
     this.updateTray();
     this.updateSettingsWindow();
@@ -129,7 +130,7 @@ class ScreenBlurApp extends EventEmitter {
 
   dismiss() {
     this.state.testOverlay = false;
-    this.engine.dismiss(Date.now());
+    this.regions.dismiss(Date.now());
     this.updateOverlay();
   }
 
@@ -149,8 +150,10 @@ class ScreenBlurApp extends EventEmitter {
 
   wireInference() {
     this.inference.on('port', (port) => this.capture.attachInferencePort(port));
-    this.inference.on('ready', ({ modelId, inputSize }) => {
-      console.log(`[inference] ready (${modelId}, input ${inputSize.width}x${inputSize.height})`);
+    this.inference.on('ready', ({ modelId, inputSize, backend }) => {
+      const tried = backend.attempts.map((a) => `${a.label}: ${a.error ? 'unavailable' : `${a.medianMs.toFixed(0)} ms`}`).join(', ');
+      console.log(`[inference] ready (${modelId}, input ${inputSize.width}x${inputSize.height}, using ${backend.label}; tried ${tried})`);
+      this.state.backend = backend.label;
       this.state.ready = true;
       this.state.error = null;
       this.refresh();
@@ -173,12 +176,26 @@ class ScreenBlurApp extends EventEmitter {
     this.updateSettingsWindow();
     if (!this.running) return;
 
-    const decision = this.engine.update(result, Date.now());
-    if (decision.stale) return;
-    if (this.config.flags.verbose) {
-      console.log(`[result] seq=${result.seq} score=${result.score.toFixed(3)} ${result.label ?? '-'} infer=${result.latencyMs.toFixed(0)}ms e2e=${Date.now() - result.ts}ms shown=${decision.shown}`);
-    }
-    if (decision.changed) this.updateOverlay();
+    const now = Date.now();
+    const update = this.regions.update(result, now);
+    if (update.stale) return;
+    if (this.config.flags.verbose) this.logResult(result, this.regions.motionStates(), now);
+    // Moving areas need a fresh predicted position on every result, not just when areas change.
+    if (update.changed || this.regions.active) this.updateOverlay();
+  }
+
+  /** One line per result; each area as [x%,y% w x h% score v=vx,vy screens/s at=capture time]. */
+  logResult(result, regions, now) {
+    const percent = (value) => (value * 100).toFixed(1);
+    const boxes = regions
+      .map(({ box, score, velocity, capturedAt }) =>
+        `[${percent(box.x)}%,${percent(box.y)}% ${percent(box.width)}x${percent(box.height)}% ${(score * 100).toFixed(0)}% ` +
+        `v=${(velocity.x * 1000).toFixed(3)},${(velocity.y * 1000).toFixed(3)} at=${Math.round(capturedAt)}]`)
+      .join(' ');
+    console.log(
+      `[result] t=${now} seq=${result.seq} age=${Math.round(now - result.ts)}ms score=${percent(result.score)}% ${result.label ?? '-'} ` +
+        `infer=${result.latencyMs.toFixed(0)}ms detections=${result.regions.length} blurred=${regions.length} ${boxes}`,
+    );
   }
 
   createTray() {
@@ -238,14 +255,17 @@ class ScreenBlurApp extends EventEmitter {
       this.capture.resume();
     } else {
       this.capture.pause();
-      this.engine.reset();
+      this.regions.reset();
     }
     this.updateOverlay();
   }
 
   updateOverlay() {
-    const detected = this.overlayEnabled && this.running && this.engine.shown;
-    this.overlay.setVisible(this.state.testOverlay || detected);
+    if (this.state.testOverlay) {
+      this.overlay.renderTestRegion();
+    } else {
+      this.overlay.render(this.overlayEnabled && this.running ? this.regions.motionStates() : []);
+    }
     this.updateTray();
   }
 
@@ -254,6 +274,7 @@ class ScreenBlurApp extends EventEmitter {
       ...this.state,
       running: this.running,
       overlayVisible: this.overlay.visible,
+      blurredAreas: this.overlayEnabled && this.running ? this.regions.regions.length : 0,
       presets: SENSITIVITY_PRESETS,
     });
     this.updateSettingsWindow();

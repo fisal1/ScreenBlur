@@ -11,7 +11,7 @@ function reportError(err) {
   window.screenblur.reportStatus('error', String(err?.message ?? err));
 }
 
-async function openScreenStream(sourceId, maxSize) {
+async function openScreenStream(sourceId, maxSize, maxFrameRate) {
   return navigator.mediaDevices.getUserMedia({
     audio: false,
     video: {
@@ -20,14 +20,17 @@ async function openScreenStream(sourceId, maxSize) {
         chromeMediaSourceId: sourceId,
         maxWidth: maxSize,
         maxHeight: maxSize,
-        maxFrameRate: 15,
+        maxFrameRate,
       },
     },
   });
 }
 
 async function open({ sourceId, settings }) {
-  const stream = await openScreenStream(sourceId, settings.maxSourceSize);
+  // Capture at the model input size: the frame is scaled once, by the capturer, and reading
+  // smaller frames back from the GPU is much faster.
+  const { width, height } = settings.inputSize;
+  const stream = await openScreenStream(sourceId, Math.max(width, height), settings.maxStreamFps);
   stream.getVideoTracks()[0].addEventListener('ended', () => reportError('Screen capture stream ended'));
   video.srcObject = stream;
   await video.play();

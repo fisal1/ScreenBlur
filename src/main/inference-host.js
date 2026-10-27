@@ -32,7 +32,14 @@ class InferenceHost extends EventEmitter {
     this.child.on('exit', (code) => this.handleExit(code));
 
     this.child.postMessage(
-      { type: WorkerMessage.INIT, modelPath: this.config.paths.model, inputSize: this.inputSize },
+      {
+        type: WorkerMessage.INIT,
+        modelPath: this.config.paths.model,
+        inputSize: this.inputSize,
+        backends: this.config.inference.backends,
+        benchmarkRuns: this.config.inference.benchmarkRuns,
+        detection: { ...this.config.detection, includeFaces: this.config.flags.detectFaces },
+      },
       [workerPort],
     );
     this.emit('port', rendererPort);

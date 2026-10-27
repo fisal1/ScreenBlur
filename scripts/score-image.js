@@ -10,7 +10,7 @@ const { app, nativeImage } = require('electron');
 const ort = require('onnxruntime-node');
 const config = require('../src/main/config');
 const { modelInputSize } = require('../src/main/model-input');
-const { rgbaToNchw, scoreExplicit, classConfidences } = require('../src/inference/nudenet');
+const { EXPLICIT_LABELS, classIdsFor, rgbaToNchw, analyze, classConfidences } = require('../src/inference/nudenet');
 
 const TOP_CLASSES = 5;
 
@@ -66,13 +66,19 @@ async function score(session, image, inputSize) {
   const { width, height } = inputSize;
   const input = new ort.Tensor('float32', rgbaToNchw(letterbox(image, inputSize), width, height), [1, 3, height, width]);
   const output = (await session.run({ [session.inputNames[0]]: input }))[session.outputNames[0]];
-  return { explicit: scoreExplicit(output), top: classConfidences(output).slice(0, TOP_CLASSES) };
+  const explicit = analyze(output, classIdsFor(EXPLICIT_LABELS), config.detection);
+  return { explicit, top: classConfidences(output).slice(0, TOP_CLASSES) };
 }
 
 function printResult(title, { explicit, top }) {
   console.log(`\n${title}`);
   console.log(`  explicit score: ${explicit.score.toFixed(3)} (${explicit.label ?? '-'})`);
-  for (const { label, score: value } of top) console.log(`  ${value.toFixed(3)}  ${label}`);
+  console.log(`  explicit areas found: ${explicit.detections.length}`);
+  for (const { score: value, label, box } of explicit.detections) {
+    console.log(`    ${value.toFixed(3)}  ${label} at ${Math.round(box.x)},${Math.round(box.y)} size ${Math.round(box.width)}x${Math.round(box.height)} (model pixels)`);
+  }
+  console.log('  top classes:');
+  for (const { label, score: value } of top) console.log(`    ${value.toFixed(3)}  ${label}`);
 }
 
 async function main() {

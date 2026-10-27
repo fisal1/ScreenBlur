@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { LABELS, rgbaToNchw, scoreExplicit } = require('../src/inference/nudenet');
+const { LABELS, EXPLICIT_LABELS, classIdsFor, rgbaToNchw, scoreExplicit, analyze } = require('../src/inference/nudenet');
 
 const MODEL_PATH = path.join(__dirname, '..', 'models', '320n.onnx');
 
@@ -37,6 +37,46 @@ test('scoreExplicit ignores non-explicit classes', () => {
     ['FEMALE_BREAST_COVERED', 1, 0.95],
   ]);
   assert.deepEqual(scoreExplicit(output), { score: 0, label: null });
+});
+
+function setBox(output, anchor, [cx, cy, w, h]) {
+  const anchors = output.dims[2];
+  output.data[anchor] = cx;
+  output.data[anchors + anchor] = cy;
+  output.data[2 * anchors + anchor] = w;
+  output.data[3 * anchors + anchor] = h;
+}
+
+test('analyze decodes boxes and merges overlapping detections', () => {
+  const output = fakeOutput(10, [
+    ['FEMALE_BREAST_EXPOSED', 0, 0.8],
+    ['FEMALE_BREAST_EXPOSED', 1, 0.6], // overlaps anchor 0 -> suppressed
+    ['BUTTOCKS_EXPOSED', 2, 0.5], // separate area
+    ['FACE_FEMALE', 3, 0.9], // not a target class
+  ]);
+  setBox(output, 0, [50, 50, 20, 20]);
+  setBox(output, 1, [52, 51, 20, 20]);
+  setBox(output, 2, [150, 80, 30, 40]);
+  setBox(output, 3, [10, 10, 10, 10]);
+
+  const { score, label, detections } = analyze(output, classIdsFor(EXPLICIT_LABELS));
+  assert.equal(Number(score.toFixed(2)), 0.8);
+  assert.equal(label, 'FEMALE_BREAST_EXPOSED');
+  assert.equal(detections.length, 2);
+  assert.deepEqual(detections[0].box, { x: 40, y: 40, width: 20, height: 20 });
+  assert.deepEqual(detections[1].box, { x: 135, y: 60, width: 30, height: 40 });
+});
+
+test('analyze drops candidates below minScore', () => {
+  const output = fakeOutput(10, [['ANUS_EXPOSED', 0, 0.05]]);
+  setBox(output, 0, [50, 50, 20, 20]);
+  const { score, detections } = analyze(output, classIdsFor(EXPLICIT_LABELS), { minScore: 0.1 });
+  assert.ok(score > 0.04);
+  assert.equal(detections.length, 0);
+});
+
+test('classIdsFor rejects unknown labels', () => {
+  assert.throws(() => classIdsFor(['NOT_A_LABEL']), /Unknown NudeNet label/);
 });
 
 test('scoreExplicit rejects unexpected output shapes', () => {

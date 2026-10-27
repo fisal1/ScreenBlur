@@ -42,9 +42,9 @@ function renderThreshold(percent) {
 
 function describeStatus({ scorePercent, thresholdPercent, overlayVisible, running }) {
   if (!running) return 'Protection is paused.';
-  if (overlayVisible) return 'Content is hidden right now.';
-  if (scorePercent >= thresholdPercent) return 'Above the threshold - the blur will appear.';
-  return 'Below the threshold - nothing is hidden.';
+  if (overlayVisible) return 'Detected areas are blurred right now.';
+  if (scorePercent >= thresholdPercent) return 'Above the threshold - the detected area will be blurred.';
+  return 'Below the threshold - nothing is blurred.';
 }
 
 function renderLive(state) {

@@ -17,7 +17,8 @@ function describeStatus(state) {
   if (state.snoozedUntil > Date.now()) return `Snoozed until ${formatTime(state.snoozedUntil)}`;
   if (!state.enabled) return 'Paused';
   if (state.locked) return 'Screen locked';
-  if (state.overlayVisible) return 'Content hidden';
+  if (state.testOverlay) return 'Showing test patch';
+  if (state.blurredAreas > 0) return `Blurring ${state.blurredAreas} area${state.blurredAreas === 1 ? '' : 's'}`;
   return 'Watching';
 }
 
@@ -29,6 +30,11 @@ function pickIconColor(state) {
 function describeLastResult(result, thresholdPercent) {
   if (!result) return '';
   return `Score ${Math.round(result.score * 100)}% (blurs at ${thresholdPercent}%)`;
+}
+
+function describeEngine(backend, result) {
+  if (!backend) return '';
+  return result ? `${backend}, ${Math.round(result.latencyMs)} ms/frame` : backend;
 }
 
 function sensitivityMenu(state, actions) {
@@ -61,7 +67,14 @@ class TrayController {
 
   update(state) {
     this.tray.setImage(this.iconFor(pickIconColor(state)));
-    this.tray.setToolTip(['ScreenBlur', describeStatus(state), describeLastResult(state.lastResult, state.thresholdPercent)].filter(Boolean).join('\n'));
+    const tooltip = [
+      'ScreenBlur',
+      describeStatus(state),
+      describeLastResult(state.lastResult, state.thresholdPercent),
+      describeEngine(state.backend, state.lastResult),
+    ];
+    // Windows truncates tray tooltips at 127 characters.
+    this.tray.setToolTip(tooltip.filter(Boolean).join('\n').slice(0, 127));
 
     // Rebuilding the menu while it's open closes it, so only rebuild when its content changes.
     const menuKey = JSON.stringify([describeStatus(state), state.enabled, state.thresholdPercent, state.overlayVisible, state.testOverlay, state.snoozedUntil > Date.now()]);
@@ -107,13 +120,13 @@ class TrayController {
         ],
       },
       {
-        label: 'This was wrong (hide overlay)',
+        label: 'This was wrong (remove blur)',
         enabled: state.overlayVisible,
         accelerator: config.hotkeys.dismiss,
         click: actions.dismiss,
       },
       {
-        label: 'Test overlay',
+        label: 'Show test patch',
         type: 'checkbox',
         checked: state.testOverlay,
         accelerator: config.hotkeys.testOverlay,

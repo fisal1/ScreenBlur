@@ -24,6 +24,7 @@ const IpcChannel = Object.freeze({
   CAPTURE_COMMAND: 'capture-command',
   CAPTURE_STATUS: 'capture-status',
   PROBE_RESULT: 'probe-result',
+  OVERLAY_RENDER: 'overlay-render',
   SETTINGS_GET: 'settings-get',
   SETTINGS_SET_THRESHOLD: 'settings-set-threshold',
   SETTINGS_UPDATE: 'settings-update',

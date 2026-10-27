@@ -11,19 +11,19 @@
       <h1>Sensitivity</h1>
 
       <section class="card">
-        <p class="threshold-line">Blur when the score reaches <strong id="threshold-value">30%</strong></p>
+        <p class="threshold-line">Blur an area when its score reaches <strong id="threshold-value">30%</strong></p>
         <input id="threshold-slider" type="range" min="5" max="95" step="1" value="30" aria-label="Blur threshold in percent" />
         <div class="scale">
           <span>More blurring</span>
           <span>Fewer false alarms</span>
         </div>
         <div id="presets" class="presets"></div>
-        <p class="hint">The blur goes away once the score drops below <span id="hide-value">15%</span>.</p>
+        <p class="hint">An area's blur goes away once its score stays below <span id="hide-value">15%</span>.</p>
       </section>
 
       <section class="card">
         <div class="meter-header">
-          <span>Current screen score</span>
+          <span>Highest score on screen</span>
           <strong id="score-value">-</strong>
         </div>
         <div class="meter" aria-hidden="true">
