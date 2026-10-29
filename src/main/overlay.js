@@ -77,7 +77,7 @@ class OverlayManager {
   async create(display) {
     this.window = createCoverWindow({
       bounds: display.bounds,
-      contentProtection: true,
+      contentProtection: this.config.platform.useContentProtection,
       preload: this.config.paths.overlayPreload,
     });
     await this.window.loadFile(this.config.paths.overlayPage, {

@@ -98,11 +98,28 @@ class FrameSampler {
   }
 }
 
-/** Number of pixels whose brightness differs by more than `delta` (0-255). */
-function countChangedPixels(a, b, delta) {
+/**
+ * Number of pixels whose brightness differs by more than `delta` (0-255).
+ * Pixels where `ignore[i]` is set are skipped.
+ */
+function countChangedPixels(a, b, delta, ignore = null) {
   let changed = 0;
   for (let i = 0; i < a.length; i++) {
+    if (ignore?.[i]) continue;
     if (Math.abs(a[i] - b[i]) > delta) changed++;
   }
   return changed;
+}
+
+/** Thumbnail-sized mask with 1 for every pixel inside one of the normalized boxes. */
+function maskFromBoxes(boxes, { width, height }) {
+  const mask = new Uint8Array(width * height);
+  for (const { x, y, width: w, height: h } of boxes) {
+    const left = Math.max(0, Math.floor(x * width));
+    const top = Math.max(0, Math.floor(y * height));
+    const right = Math.min(width, Math.ceil((x + w) * width));
+    const bottom = Math.min(height, Math.ceil((y + h) * height));
+    for (let row = top; row < bottom; row++) mask.fill(1, row * width + left, row * width + right);
+  }
+  return mask;
 }

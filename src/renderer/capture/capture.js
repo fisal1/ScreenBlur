@@ -5,6 +5,7 @@ const video = document.getElementById('screen');
 
 let pipeline = null;
 let pendingPort = null;
+let pendingMask = [];
 let resumeRequested = false;
 
 function reportError(err) {
@@ -37,6 +38,7 @@ async function open({ sourceId, settings }) {
 
   pipeline = new CapturePipeline(new FrameSampler(video, settings), settings, { WorkerMessage, onError: reportError });
   if (pendingPort) pipeline.setPort(pendingPort);
+  pipeline.setMask(pendingMask);
   if (resumeRequested) pipeline.resume();
   window.screenblur.reportStatus('info', `capturing ${video.videoWidth}x${video.videoHeight}`);
 }
@@ -50,6 +52,10 @@ const commandHandlers = {
   [CaptureCommand.PAUSE]: () => {
     resumeRequested = false;
     pipeline?.pause();
+  },
+  [CaptureCommand.SET_MASK]: ({ boxes }) => {
+    pendingMask = boxes;
+    pipeline?.setMask(boxes);
   },
   [CaptureCommand.PROBE]: ({ id }) => {
     window.screenblur.reportProbe(id, pipeline ? pipeline.sampler.magentaFraction() : 0);

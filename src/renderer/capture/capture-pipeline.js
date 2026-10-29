@@ -29,8 +29,16 @@ class CapturePipeline {
     this.lastSentAt = 0;
     this.lastSentFrame = -1;
     this.lastSentThumbnail = null;
+    this.mask = null; // thumbnail pixels covered by our overlay
+    this.maskedPixels = 0;
 
     sampler.onFrame(() => this.trySend());
+  }
+
+  /** Areas covered by our overlay (normalized boxes); change detection ignores them. */
+  setMask(boxes) {
+    this.mask = boxes.length ? maskFromBoxes(boxes, this.sampler.thumbnailSize) : null;
+    this.maskedPixels = this.mask ? this.mask.reduce((sum, value) => sum + value, 0) : 0;
   }
 
   setPort(port) {
@@ -90,16 +98,21 @@ class CapturePipeline {
     if (!hasNewFrame && elapsed < idleInterval) return;
 
     const thumbnail = this.sampler.thumbnail();
-    if (hasNewFrame && elapsed < idleInterval && this.isStatic(thumbnail)) return;
+    const changedPixels = this.changedPixels(thumbnail);
+    if (hasNewFrame && elapsed < idleInterval && changedPixels <= this.settings.staticMaxChangedPixels) return;
 
-    this.send(now);
+    const visiblePixels = Math.max(1, thumbnail.length - this.maskedPixels);
+    this.send(now, Math.min(1, changedPixels / visiblePixels));
     this.lastSentThumbnail = thumbnail;
   }
 
-  isStatic(thumbnail) {
-    if (!this.lastSentThumbnail) return false;
-    const { staticPixelDelta, staticMaxChangedPixels } = this.settings;
-    return countChangedPixels(thumbnail, this.lastSentThumbnail, staticPixelDelta) <= staticMaxChangedPixels;
+  /**
+   * Thumbnail pixels outside our overlay that changed since the last sent frame
+   * (all of them for the first frame).
+   */
+  changedPixels(thumbnail) {
+    if (!this.lastSentThumbnail) return thumbnail.length;
+    return countChangedPixels(thumbnail, this.lastSentThumbnail, this.settings.staticPixelDelta, this.mask);
   }
 
   retryAfter(delayMs) {
@@ -110,7 +123,8 @@ class CapturePipeline {
     }, delayMs);
   }
 
-  send(now) {
+  /** @param sceneChange share (0..1) of the screen that changed since the last sent frame */
+  send(now, sceneChange) {
     const { image, contentWidth, contentHeight } = this.sampler.letterboxedFrame();
     this.seq += 1;
     this.inFlight.set(this.seq, now);
@@ -122,6 +136,7 @@ class CapturePipeline {
       type: this.WorkerMessage.FRAME,
       seq: this.seq,
       ts: this.sampler.frameCapturedAt, // when the screen content was captured
+      sceneChange,
       width: image.width,
       height: image.height,
       contentWidth,

@@ -1,6 +1,7 @@
 // Phase 0 de-risk checks (RFC 8): pipeline latency and overlay exclusion from capture.
 const fs = require('node:fs');
-const { desktopCapturer } = require('electron');
+const path = require('node:path');
+const { app, desktopCapturer } = require('electron');
 const { ScreenBlurApp } = require('./screenblur-app');
 const { createCoverWindow } = require('./overlay');
 
@@ -96,7 +97,14 @@ async function checkContentProtection(screenBlur) {
 }
 
 async function runSelfTest(config) {
-  const report = { startedAt: new Date().toISOString(), platform: `${process.platform} ${process.getSystemVersion()}`, checks: {} };
+  const report = {
+    startedAt: new Date().toISOString(),
+    platform: `${process.platform} ${process.getSystemVersion()}`,
+    // What the app currently assumes; if the content protection check passes on a platform that
+    // assumes otherwise, start the app with --overlay-hidden-from-capture.
+    assumesOverlayHiddenFromCapture: config.platform.overlayHiddenFromCapture,
+    checks: {},
+  };
   const screenBlur = new ScreenBlurApp(config, { showTray: false, overlayEnabled: false });
 
   try {
@@ -111,7 +119,9 @@ async function runSelfTest(config) {
   }
 
   report.passed = !report.error && report.checks.contentProtection?.verdict === 'pass';
-  fs.writeFileSync(config.paths.selfTestReport, JSON.stringify(report, null, 2));
+  const reportDir = config.packaged ? app.getPath('userData') : config.paths.root;
+  report.path = path.join(reportDir, config.paths.selfTestReportName);
+  fs.writeFileSync(report.path, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   return report.passed;
 }

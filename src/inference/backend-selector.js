@@ -1,8 +1,15 @@
-// Picks the fastest working ONNX Runtime execution provider (GPU via DirectML, or CPU)
-// by timing a few runs of the model at the real input size.
+// Picks the fastest working ONNX Runtime execution provider (GPU via DirectML, CoreML or CUDA,
+// or CPU) by timing a few runs of the model at the real input size.
 
-function describeBackend({ name, deviceId }) {
-  return name === 'dml' ? `GPU ${deviceId} (DirectML)` : name.toUpperCase();
+const BACKEND_LABELS = Object.freeze({
+  dml: ({ deviceId }) => `GPU ${deviceId} (DirectML)`,
+  coreml: () => 'Apple GPU / Neural Engine (CoreML)',
+  cuda: () => 'NVIDIA GPU (CUDA)',
+  cpu: () => 'CPU',
+});
+
+function describeBackend(backend) {
+  return BACKEND_LABELS[backend.name]?.(backend) ?? backend.name.toUpperCase();
 }
 
 function sessionOptions(backend) {

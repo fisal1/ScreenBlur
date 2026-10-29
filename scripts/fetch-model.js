@@ -28,7 +28,10 @@ function verify(buffer) {
 
 async function download() {
   console.log(`Downloading NudeNet 320n model from ${MODEL.url}`);
-  const response = await fetch(MODEL.url, { headers: { Accept: 'application/octet-stream' } });
+  const headers = { Accept: 'application/octet-stream' };
+  // Unauthenticated GitHub API calls are rate-limited per IP; CI runners share IPs.
+  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  const response = await fetch(MODEL.url, { headers });
   if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
   return Buffer.from(await response.arrayBuffer());
 }

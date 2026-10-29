@@ -65,6 +65,7 @@ async function handleFrame(detector, frame, detection) {
     type: WorkerMessage.RESULT,
     seq: frame.seq,
     ts: frame.ts,
+    sceneChange: frame.sceneChange,
     score,
     label,
     regions,

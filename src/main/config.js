@@ -1,21 +1,30 @@
 const path = require('node:path');
+const { describePlatform } = require('./platform');
 
 const ROOT = path.join(__dirname, '..', '..');
 const SRC = path.join(ROOT, 'src');
+// In an installed app the code is inside app.asar and the model and GIF are copied next to it
+// as extra resources (see "build.extraResources" in package.json).
+const PACKAGED = __dirname.includes(`${path.sep}app.asar`);
+const RESOURCES = PACKAGED ? process.resourcesPath : ROOT;
+const PLATFORM = describePlatform();
 
 const config = Object.freeze({
+  packaged: PACKAGED,
+  platform: PLATFORM,
+
   paths: Object.freeze({
     root: ROOT,
-    model: path.join(ROOT, 'models', '320n.onnx'),
+    model: path.join(RESOURCES, 'models', '320n.onnx'),
     inferenceWorker: path.join(SRC, 'inference', 'worker.js'),
     capturePage: path.join(SRC, 'renderer', 'capture', 'index.html'),
     capturePreload: path.join(SRC, 'renderer', 'capture', 'preload.js'),
     overlayPage: path.join(SRC, 'renderer', 'overlay', 'index.html'),
     overlayPreload: path.join(SRC, 'renderer', 'overlay', 'preload.js'),
-    patchGif: path.join(ROOT, 'assets', 'patch.gif'), // shown over detected areas; blur is used if missing
+    patchGif: path.join(RESOURCES, 'assets', 'patch.gif'), // shown over detected areas; blur is used if missing
     settingsPage: path.join(SRC, 'renderer', 'settings', 'index.html'),
     settingsPreload: path.join(SRC, 'renderer', 'settings', 'preload.js'),
-    selfTestReport: path.join(ROOT, 'selftest-results.json'),
+    selfTestReportName: 'selftest-results.json', // project folder in development, userData when installed
   }),
 
   // The model accepts any input size that is a multiple of 32. Frames keep the screen's aspect
@@ -41,15 +50,9 @@ const config = Object.freeze({
 
   inference: Object.freeze({
     restartDelayMs: 1000,
-    // Tried at startup; the fastest one that works is used. DirectML device numbering differs
-    // between machines (laptops usually list the integrated GPU first), so all are measured.
+    // Tried at startup; the fastest one that works is used (see platform.js).
     // Measured on a Ryzen 7 4800H laptop at 960x544: CPU ~140 ms, Radeon iGPU ~45 ms, RTX 3050 ~19 ms.
-    backends: Object.freeze([
-      Object.freeze({ name: 'dml', deviceId: 0 }),
-      Object.freeze({ name: 'dml', deviceId: 1 }),
-      Object.freeze({ name: 'dml', deviceId: 2 }),
-      Object.freeze({ name: 'cpu' }),
-    ]),
+    backends: PLATFORM.backends,
     benchmarkRuns: 5,
   }),
 
@@ -76,6 +79,12 @@ const config = Object.freeze({
     // covers both the captured and the predicted position.
     renderDelayMs: 40,
     maxLeadMs: 200, // never predict further ahead than this
+    // Where the overlay shows up in our own capture (macOS, Linux; see platform.js), a covered
+    // area can't be re-confirmed: the detector sees the patch, not the content. Covered areas
+    // are then held until the scene changes or for at most coveredMaxHoldMs.
+    overlayHiddenFromCapture: PLATFORM.overlayHiddenFromCapture,
+    sceneCutFraction: 0.35, // share of changed thumbnail pixels that counts as a new scene
+    coveredMaxHoldMs: 8000,
   }),
 
   hotkeys: Object.freeze({

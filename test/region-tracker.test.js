@@ -171,3 +171,54 @@ test('drawn boxes stay on screen', () => {
   const { box } = tracker.displayRegions(240)[0];
   assert.ok(box.x + box.width <= 1 + 1e-9);
 });
+
+// ---- covered-area hold (overlay visible to our own capture) ----
+
+const covered = { ...options, overlayHiddenFromCapture: false, sceneCutFraction: 0.35, coveredMaxHoldMs: 8000 };
+
+function coveredUpdate(tracker, seq, now, detections = [], sceneChange = 0) {
+  return tracker.update({ seq, ts: now, sceneChange, regions: detections }, now);
+}
+
+test('a covered area is held while the scene stays the same', () => {
+  const tracker = new RegionTracker(covered);
+  coveredUpdate(tracker, 1, 0, [detection(0.5)]);
+  // Our patch now hides the content, so nothing is detected; the scene barely changes.
+  for (let i = 2; i <= 20; i++) coveredUpdate(tracker, i, i * 300, [], 0.02);
+  assert.equal(tracker.regions.length, 1);
+});
+
+test('a covered area is released when the scene changes', () => {
+  const tracker = new RegionTracker(covered);
+  coveredUpdate(tracker, 1, 0, [detection(0.5)]);
+  coveredUpdate(tracker, 2, 300, [], 0.02);
+  coveredUpdate(tracker, 3, 600, [], 0.6); // scene cut: hold stops
+  coveredUpdate(tracker, 4, 2200, [], 0.02);
+  assert.equal(tracker.regions.length, 0);
+});
+
+test('a covered area is re-checked after coveredMaxHoldMs', () => {
+  const tracker = new RegionTracker(covered);
+  coveredUpdate(tracker, 1, 0, [detection(0.5)]);
+  coveredUpdate(tracker, 2, 7900, [], 0.01);
+  assert.equal(tracker.regions.length, 1);
+  coveredUpdate(tracker, 3, 8100, [], 0.01); // past the max hold: no longer refreshed
+  coveredUpdate(tracker, 4, 9700, [], 0.01); // and expires after holdMs
+  assert.equal(tracker.regions.length, 0);
+});
+
+test('a real detection restarts the covered hold', () => {
+  const tracker = new RegionTracker(covered);
+  coveredUpdate(tracker, 1, 0, [detection(0.5)]);
+  coveredUpdate(tracker, 2, 7000, [detection(0.5)]); // content seen again (e.g. moved partly out)
+  coveredUpdate(tracker, 3, 14000, [], 0.01);
+  assert.equal(tracker.regions.length, 1);
+});
+
+test('areas are not held when the overlay is hidden from capture', () => {
+  const tracker = new RegionTracker({ ...covered, overlayHiddenFromCapture: true });
+  coveredUpdate(tracker, 1, 0, [detection(0.5)]);
+  coveredUpdate(tracker, 2, 1000, [], 0.01);
+  coveredUpdate(tracker, 3, 1600, [], 0.01);
+  assert.equal(tracker.regions.length, 0);
+});

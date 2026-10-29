@@ -1,19 +1,125 @@
 {
   "name": "screenblur",
-  "version": "0.1.0",
-  "description": "ScreenBlur POC - detects explicit content on screen and covers it with an overlay. All processing is local.",
+  "productName": "ScreenBlur",
+  "version": "0.2.0",
+  "description": "Detects explicit content on screen and covers just those areas. All processing is local.",
   "main": "src/main/index.js",
   "private": true,
+  "author": {
+    "name": "fisal1",
+    "email": "mohamedfisal7476@gmail.com"
+  },
+  "homepage": "https://github.com/fisal1/ScreenBlur",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fisal1/ScreenBlur.git"
+  },
   "scripts": {
     "start": "electron .",
     "verbose": "electron . --verbose",
     "selftest": "electron . --selftest",
     "test": "node --test \"test/**/*.test.js\"",
     "fetch-model": "node scripts/fetch-model.js",
-    "postinstall": "node scripts/fetch-model.js"
+    "postinstall": "node scripts/fetch-model.js",
+    "dist": "electron-builder --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
   },
   "dependencies": {
-    "electron": "^45.0.0",
     "onnxruntime-node": "^1.30.0"
+  },
+  "devDependencies": {
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.fisal1.screenblur",
+    "productName": "ScreenBlur",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!tools/**",
+      "!models/**",
+      "!assets/**",
+      "!build/**",
+      "!dist/**",
+      "!docs/**",
+      "!test/**",
+      "!scripts/**",
+      "!*.{ps1,sh,md}",
+      "!selftest-results.json",
+      "!node_modules/onnxruntime-node/script/**"
+    ],
+    "extraResources": [
+      {
+        "from": "models/320n.onnx",
+        "to": "models/320n.onnx"
+      },
+      {
+        "from": "assets/patch.gif",
+        "to": "assets/patch.gif"
+      }
+    ],
+    "afterPack": "scripts/after-pack.js",
+    "asarUnpack": [
+      "node_modules/onnxruntime-node/bin/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "LSUIElement": true
+      }
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility",
+      "maintainer": "fisal1 <mohamedfisal7476@gmail.com>"
+    }
   }
 }

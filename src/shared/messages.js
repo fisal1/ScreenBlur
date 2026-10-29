@@ -16,6 +16,7 @@ const CaptureCommand = Object.freeze({
   PAUSE: 'pause',
   RESUME: 'resume',
   PROBE: 'probe',
+  SET_MASK: 'set-mask', // areas covered by our overlay, ignored by change detection
 });
 
 /** Electron IPC channels between main and the renderers. */

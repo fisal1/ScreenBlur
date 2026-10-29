@@ -60,6 +60,14 @@ class CaptureHost extends EventEmitter {
     this.sendCommand({ type: CaptureCommand.RESUME });
   }
 
+  /**
+   * Screen areas (normalized boxes) covered by our overlay. Where the overlay shows up in the
+   * capture, change detection ignores them so the animated patch isn't mistaken for content.
+   */
+  setMask(boxes) {
+    this.sendCommand({ type: CaptureCommand.SET_MASK, boxes });
+  }
+
   /** Fraction of pixels in the live capture stream that are pure magenta (self-test). */
   probeMagentaFraction() {
     const id = this.nextProbeId++;

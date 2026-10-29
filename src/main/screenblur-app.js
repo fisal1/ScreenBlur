@@ -16,6 +16,7 @@ const { TrayController } = require('./tray');
 const { SettingsStore } = require('./settings-store');
 const { SettingsWindow } = require('./settings-window');
 const { registerHotkeys, unregisterHotkeys } = require('./hotkeys');
+const { hasScreenRecordingPermission, explainScreenRecordingPermission } = require('./permissions');
 
 const MINUTE_MS = 60_000;
 
@@ -44,6 +45,7 @@ class ScreenBlurApp extends EventEmitter {
     this.settingsWindow = null;
     this.display = null;
     this.timers = { snooze: null, trayRefresh: null };
+    this.lastMaskKey = null;
 
     this.state = {
       enabled: true,
@@ -75,6 +77,14 @@ class ScreenBlurApp extends EventEmitter {
     this.registerHotkeys();
     this.watchSystemEvents();
     this.refresh();
+    this.checkScreenRecordingPermission();
+  }
+
+  /** macOS: capture silently returns empty frames without the Screen Recording permission. */
+  checkScreenRecordingPermission() {
+    if (!this.config.platform.needsScreenRecordingPermission || hasScreenRecordingPermission()) return;
+    this.setError('Screen Recording permission needed');
+    explainScreenRecordingPermission().catch((err) => console.error('[permissions]', err));
   }
 
   stop() {
@@ -266,7 +276,18 @@ class ScreenBlurApp extends EventEmitter {
     } else {
       this.overlay.render(this.overlayEnabled && this.running ? this.regions.motionStates() : []);
     }
+    this.updateCaptureMask();
     this.updateTray();
+  }
+
+  /** Where our overlay shows up in the capture, tell change detection to ignore it. */
+  updateCaptureMask() {
+    if (this.config.platform.overlayHiddenFromCapture) return;
+    const boxes = this.overlay.visible ? this.regions.displayRegions(Date.now()).map(({ box }) => box) : [];
+    const key = JSON.stringify(boxes);
+    if (key === this.lastMaskKey) return;
+    this.lastMaskKey = key;
+    this.capture.setMask(boxes);
   }
 
   updateTray() {

@@ -11,6 +11,13 @@ const { predictBox, sweptBox } = require('../shared/motion');
 // Motion compensation: each area's velocity is estimated from successive detections. When
 // drawn, an area covers both where the content was when captured and where it is predicted
 // to be now, so moving content stays covered whether it keeps moving or stops.
+//
+// Covered-area hold: when the overlay appears in our own capture (overlayHiddenFromCapture =
+// false), the detector sees the patch instead of the content, so a covered area can't be
+// re-confirmed. Such areas are kept until the scene changes (`sceneChange`, the share of
+// changed pixels, reaches sceneCutFraction) or for at most coveredMaxHoldMs since the content
+// was last actually detected. Without this the patch would disappear, the content would show,
+// get re-detected, and the patch would blink.
 
 const DEFAULTS = Object.freeze({
   thresholdHigh: 0.3,
@@ -22,6 +29,9 @@ const DEFAULTS = Object.freeze({
   maxSpeed: 4, // screens per second; faster estimates are treated as detection noise
   renderDelayMs: 20, // time from receiving a result until the patch is on screen
   maxLeadMs: 200, // never predict further ahead than this
+  overlayHiddenFromCapture: true,
+  sceneCutFraction: 0.35,
+  coveredMaxHoldMs: 8000,
 });
 
 class RegionTracker {
@@ -46,11 +56,12 @@ class RegionTracker {
   }
 
   /**
-   * @param result { seq, ts, regions: [{ box, score, label, mosaic }] } with boxes normalized
-   *        to the screen and `ts` the capture time of the frame
+   * @param result { seq, ts, sceneChange, regions: [{ box, score, label, mosaic }] } with boxes
+   *        normalized to the screen, `ts` the capture time of the frame and `sceneChange` the
+   *        share (0..1) of screen pixels that changed since the previous frame
    * @returns { stale, changed }
    */
-  update({ seq, ts, regions: detections = [] }, now) {
+  update({ seq, ts, sceneChange = 0, regions: detections = [] }, now) {
     if (seq <= this.lastAppliedSeq) return { stale: true, changed: false };
     this.lastAppliedSeq = seq;
 
@@ -58,7 +69,7 @@ class RegionTracker {
     if (now < this.suppressUntil) {
       this.regions = [];
     } else {
-      this.applyDetections(detections, ts ?? now, now);
+      this.applyDetections(detections, ts ?? now, now, sceneChange);
     }
     return { stale: false, changed: this.ids() !== before };
   }
@@ -85,14 +96,18 @@ class RegionTracker {
     return { id, box, velocity, capturedAt, mosaic, score, label };
   }
 
-  applyDetections(detections, capturedAt, now) {
+  applyDetections(detections, capturedAt, now, sceneChange) {
     const { thresholdHigh, thresholdLow, holdMs, matchIou } = this.options;
     const candidates = detections.filter((detection) => detection.score >= thresholdLow);
     const used = new Set();
+    const unmatched = [];
 
     for (const region of this.regions) {
       const match = this.bestMatch(this.predictBox(region, capturedAt), candidates, used);
-      if (!match) continue;
+      if (!match) {
+        unmatched.push(region);
+        continue;
+      }
       used.add(match);
       this.follow(region, match, capturedAt, now);
     }
@@ -100,10 +115,25 @@ class RegionTracker {
     for (const detection of candidates) {
       if (used.has(detection) || detection.score < thresholdHigh) continue;
       if (this.regions.some((region) => iou(region.box, detection.box) >= matchIou)) continue;
-      this.regions.push({ id: this.nextId++, ...detection, velocity: { x: 0, y: 0 }, capturedAt, confirmedAt: now });
+      this.regions.push({ id: this.nextId++, ...detection, velocity: { x: 0, y: 0 }, capturedAt, confirmedAt: now, detectedAt: now });
     }
 
+    if (!this.options.overlayHiddenFromCapture) this.holdCovered(unmatched, now, sceneChange);
     this.regions = this.regions.filter((region) => now - region.confirmedAt <= holdMs);
+  }
+
+  /**
+   * Keeps covered areas alive while the scene stays the same (see "Covered-area hold").
+   * A scene cut ends an area's hold until the content is actually detected again.
+   */
+  holdCovered(regions, now, sceneChange) {
+    const { sceneCutFraction, coveredMaxHoldMs } = this.options;
+    const sceneCut = sceneChange >= sceneCutFraction;
+    for (const region of regions) {
+      if (sceneCut) region.holdReleased = true;
+      if (region.holdReleased || now - region.detectedAt > coveredMaxHoldMs) continue;
+      region.confirmedAt = now;
+    }
   }
 
   follow(region, detection, capturedAt, now) {
@@ -123,6 +153,8 @@ class RegionTracker {
       mosaic: detection.mosaic,
       capturedAt,
       confirmedAt: now,
+      detectedAt: now,
+      holdReleased: false,
     });
   }
 
