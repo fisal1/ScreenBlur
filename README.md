@@ -12,7 +12,7 @@ tray / menu bar; left-click its icon for settings.
 
 | System | File | Notes |
 | :-- | :-- | :-- |
-| Windows 10 2004+ / 11 (x64) | `ScreenBlur Setup x.y.z.exe` | Not code-signed: on "Windows protected your PC" choose **More info > Run anyway**. |
+| Windows 10 2004+ / 11 (x64) | `ScreenBlur.Setup.x.y.z.exe` | Not code-signed: on "Windows protected your PC" choose **More info > Run anyway**. |
 | macOS 12+ on Apple Silicon (M1 or later) | `ScreenBlur-x.y.z-arm64.dmg` | Not notarized: after copying to Applications, right-click the app > **Open** (or run `xattr -cr /Applications/ScreenBlur.app`). Allow **Screen Recording** when asked, then reopen ScreenBlur. Intel Macs are not supported (no ONNX Runtime build). |
 | Linux x64 | `ScreenBlur-x.y.z.AppImage` or `screenblur_x.y.z_amd64.deb` | AppImage: `chmod +x` it and run. Needs a desktop with a compositor; on GNOME the tray icon needs the AppIndicator extension. On Wayland, the system asks which screen to share each time ScreenBlur starts. |
 
