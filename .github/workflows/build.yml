@@ -76,4 +76,11 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: installers/*
+          # 0.x releases are pre-releases: the macOS and Linux builds are not yet tested on real hardware.
+          prerelease: ${{ startsWith(github.ref_name, 'v0.') || contains(github.ref_name, '-') }}
           generate_release_notes: true
+          body: |
+            Installers for Windows (x64), macOS (Apple Silicon) and Linux (x64).
+            They are not code-signed, so each system shows a warning the first time; see the
+            [install instructions](https://github.com/fisal1/ScreenBlur#install).
+            Only the Windows build has been tested on real hardware so far.
