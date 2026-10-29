@@ -17,6 +17,9 @@ env:
   NODE_VERSION: 24
   # The model download uses the GitHub API, which rate-limits unauthenticated calls per IP.
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # Don't download onnxruntime's optional CUDA libraries on Linux: they add ~500 MB to the
+  # installers and only work with NVIDIA's CUDA toolkit installed. Linux builds use the CPU.
+  npm_config_onnxruntime_node_install: skip
 
 jobs:
   build:

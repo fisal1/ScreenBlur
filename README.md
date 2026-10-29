@@ -20,7 +20,7 @@ tray / menu bar; left-click its icon for settings.
 
 | | Windows | macOS | Linux |
 | :-- | :-- | :-- | :-- |
-| GPU acceleration | DirectML (any GPU) | CoreML | CUDA if installed, else CPU |
+| GPU acceleration | DirectML (any GPU) | CoreML | CPU in the installers; CUDA when run from source with CUDA installed |
 | Overlay hidden from its own capture | Yes (verified) | Unverified; assumed no | No |
 | Tested on real hardware | Yes | Built and unit-tested in CI only | Built and unit-tested in CI only |
 

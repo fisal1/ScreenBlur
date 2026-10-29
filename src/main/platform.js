@@ -5,7 +5,8 @@
  * loads and keeps the fastest (see inference/backend-selector.js).
  * - Windows: DirectML on every GPU (laptops usually list the integrated GPU first).
  * - macOS: CoreML (Apple GPU / Neural Engine).
- * - Linux: CUDA when an NVIDIA driver and CUDA runtime are installed.
+ * - Linux: CUDA, only when running from source with onnxruntime's CUDA libraries and NVIDIA's
+ *   CUDA toolkit installed (the installers leave them out; they would add ~500 MB).
  * CPU always works and is the fallback everywhere.
  */
 const BACKENDS = Object.freeze({
