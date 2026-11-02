@@ -3,11 +3,11 @@
 // so the renderer can send the next frame, and reports results to main via parentPort.
 const ort = require('onnxruntime-node');
 const { WorkerMessage } = require('../shared/messages');
-const { EXPLICIT_LABELS, FACE_LABELS, classIdsFor, rgbaToNchw, analyze } = require('./nudenet');
+const { rgbaToNchw, analyze } = require('./yolo');
+const { getModel, targetClassIds } = require('./models');
 const { toScreenRegions } = require('./regions');
 const { createFastestSession, createFirstWorkingSession } = require('./backend-selector');
 
-const MODEL_ID = 'nudenet-320n';
 const MODEL_STRIDE = 32;
 const parentPort = process.parentPort;
 
@@ -19,14 +19,15 @@ const SELECTORS = Object.freeze({
 });
 
 class Detector {
-  static async load({ modelPath, inputSize, backends, selection, benchmarkRuns }, classIds) {
+  static async load({ modelPath, inputSize, backends, selection, benchmarkRuns }, model, classIds) {
     const select = SELECTORS[selection] ?? createFastestSession;
-    return new Detector(await select(ort, modelPath, inputSize, backends, benchmarkRuns), classIds);
+    return new Detector(await select(ort, modelPath, inputSize, backends, benchmarkRuns), model, classIds);
   }
 
-  constructor({ session, backend, label, medianMs, attempts }, classIds) {
+  constructor({ session, backend, label, medianMs, attempts }, model, classIds) {
     this.session = session;
     this.backend = { ...backend, label, medianMs, attempts };
+    this.labels = model.labels;
     this.classIds = classIds;
     this.inputName = session.inputNames[0];
     this.outputName = session.outputNames[0];
@@ -40,7 +41,7 @@ class Detector {
     rgbaToNchw(rgba, width, height, this.input);
     const tensor = new ort.Tensor('float32', this.input, [1, 3, height, width]);
     const outputs = await this.session.run({ [this.inputName]: tensor });
-    return analyze(outputs[this.outputName], this.classIds, options);
+    return analyze(outputs[this.outputName], this.labels, this.classIds, options);
   }
 }
 
@@ -129,11 +130,12 @@ parentPort.on('message', async ({ data: message, ports }) => {
   if (message.type !== WorkerMessage.INIT) return;
 
   const { detection } = message;
-  const labels = detection.includeFaces ? [...EXPLICIT_LABELS, ...FACE_LABELS] : EXPLICIT_LABELS;
+  const model = getModel(message.modelId);
 
   let detector;
   try {
-    detector = await Detector.load(message, classIdsFor(labels));
+    const classIds = targetClassIds(model, { includeTestTargets: detection.includeFaces });
+    detector = await Detector.load(message, model, classIds);
   } catch (err) {
     reportError('MODEL_NOT_LOADED', err);
     return;
@@ -142,9 +144,8 @@ parentPort.on('message', async ({ data: message, ports }) => {
   listenForFrames(detector, ports[0], detection);
   parentPort.postMessage({
     type: WorkerMessage.READY,
-    modelId: MODEL_ID,
+    modelId: model.id,
     inputSize: message.inputSize,
-    labels,
     backend: detector.backend,
   });
 });

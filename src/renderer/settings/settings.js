@@ -13,7 +13,51 @@ const elements = {
   meterFill: document.getElementById('meter-fill'),
   meterMarker: document.getElementById('meter-marker'),
   status: document.getElementById('status'),
+  models: document.getElementById('models'),
+  modes: document.getElementById('modes'),
+  engineStatus: document.getElementById('engine-status'),
 };
+
+/** Builds the model and performance choices; clicking one asks main to apply it (restarts). */
+function renderEngineChoices({ models, modelId, performanceModes, performanceMode }) {
+  elements.models.replaceChildren(...models.map((model) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `choice${model.id === modelId ? ' active' : ''}`;
+    button.setAttribute('role', 'radio');
+    button.setAttribute('aria-checked', String(model.id === modelId));
+    const name = document.createElement('span');
+    name.className = 'choice-name';
+    name.textContent = model.name;
+    const description = document.createElement('span');
+    description.className = 'choice-description';
+    description.textContent = model.description;
+    button.append(name, description);
+    button.addEventListener('click', () => model.id !== modelId && api.setModel(model.id));
+    return button;
+  }));
+
+  elements.modes.replaceChildren(...performanceModes.map((mode) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = mode.name;
+    button.className = mode.id === performanceMode ? 'active' : '';
+    button.setAttribute('role', 'radio');
+    button.setAttribute('aria-checked', String(mode.id === performanceMode));
+    button.addEventListener('click', () => mode.id !== performanceMode && api.setPerformanceMode(mode.id));
+    return button;
+  }));
+}
+
+function renderEngineStatus({ models, modelId, backend, msPerFrame }) {
+  const modelName = models.find((model) => model.id === modelId)?.name ?? modelId;
+  if (!backend) {
+    elements.engineStatus.textContent = `Starting ${modelName}...`;
+    return;
+  }
+  const timing = msPerFrame === null ? '' : `, ${msPerFrame} ms per check`;
+  elements.engineStatus.textContent = `Running ${modelName} on ${backend}${timing}.`;
+}
 
 let presetButtons = [];
 
@@ -67,6 +111,7 @@ function render(state) {
   // Don't fight the user's drag with an echo of their own change.
   if (!dragging) renderThreshold(state.thresholdPercent);
   renderLive(state);
+  renderEngineStatus(state.engine);
 }
 
 elements.slider.addEventListener('input', () => applyThreshold(Number(elements.slider.value)));
@@ -81,5 +126,7 @@ api.getState().then((state) => {
   renderPresets(state.presets);
   renderThreshold(state.thresholdPercent);
   renderLive(state);
+  renderEngineChoices(state.engine);
+  renderEngineStatus(state.engine);
   api.onUpdate(render);
 });

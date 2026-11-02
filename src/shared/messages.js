@@ -28,6 +28,8 @@ const IpcChannel = Object.freeze({
   OVERLAY_RENDER: 'overlay-render',
   SETTINGS_GET: 'settings-get',
   SETTINGS_SET_THRESHOLD: 'settings-set-threshold',
+  SETTINGS_SET_MODEL: 'settings-set-model',
+  SETTINGS_SET_PERFORMANCE_MODE: 'settings-set-performance-mode',
   SETTINGS_UPDATE: 'settings-update',
 });
 

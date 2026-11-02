@@ -8,6 +8,8 @@ const {
   thresholdsFromPercent,
 } = require('./sensitivity');
 const { RegionTracker } = require('./region-tracker');
+const { resolveEngine, PERFORMANCE_MODES } = require('./engine-profile');
+const { MODELS, DEFAULT_MODEL_ID } = require('../inference/models');
 const { InferenceHost } = require('./inference-host');
 const { CaptureHost } = require('./capture-host');
 const { OverlayManager } = require('./overlay');
@@ -34,11 +36,17 @@ class ScreenBlurApp extends EventEmitter {
 
     this.settings = new SettingsStore(path.join(app.getPath('userData'), config.settingsFileName), {
       thresholdPercent: SENSITIVITY_PRESETS.balanced,
+      modelId: DEFAULT_MODEL_ID,
+      performanceMode: PERFORMANCE_MODES.best.id,
     });
     const thresholdPercent = clampThresholdPercent(this.settings.get('thresholdPercent'));
+    this.engine = resolveEngine(config, {
+      modelId: this.settings.get('modelId'),
+      performanceMode: this.settings.get('performanceMode'),
+    });
 
     this.regions = new RegionTracker({ ...config.regionTracking, ...thresholdsFromPercent(thresholdPercent) });
-    this.inference = new InferenceHost(config, this.createBackendMemory());
+    this.inference = new InferenceHost(config, this.engine, this.createBackendMemory(this.engine.model.id));
     this.capture = new CaptureHost(config);
     this.overlay = new OverlayManager(config);
     this.tray = null;
@@ -62,13 +70,13 @@ class ScreenBlurApp extends EventEmitter {
 
   async start() {
     this.display = screen.getPrimaryDisplay();
-    const inputSize = modelInputSize(this.display.size, this.config.modelInput);
+    const inputSize = modelInputSize(this.display.size, this.engine.modelInput);
     await this.overlay.create(this.display);
     await this.capture.create();
     this.wireCapture();
     this.wireInference();
     this.inference.start(inputSize);
-    await this.capture.open(this.display, inputSize);
+    await this.capture.open(this.display, { ...this.engine.capture, inputSize });
 
     if (this.showTray) {
       this.createTray();
@@ -100,19 +108,38 @@ class ScreenBlurApp extends EventEmitter {
   }
 
   /**
-   * Remembers the fastest inference backend in the settings file, per app version (an update
-   * may change what's fastest), so later starts load only that one (see inference-host.js).
+   * Remembers the fastest inference backend in the settings file, per model and app version
+   * (either may change what's fastest), so later starts load only that one (see inference-host.js).
    */
-  createBackendMemory() {
+  createBackendMemory(modelId) {
     const appVersion = app.getVersion();
+    const all = () => this.settings.get('inferenceBackends') ?? {};
+    const write = (entry) => this.settings.set('inferenceBackends', { ...all(), [modelId]: entry });
     return {
       load: () => {
-        const saved = this.settings.get('inferenceBackend');
+        const saved = all()[modelId];
         return saved?.appVersion === appVersion ? { name: saved.name, deviceId: saved.deviceId } : null;
       },
-      save: (backend) => this.settings.set('inferenceBackend', { ...backend, appVersion }),
-      clear: () => this.settings.set('inferenceBackend', null),
+      save: (backend) => write({ ...backend, appVersion }),
+      clear: () => write(null),
     };
+  }
+
+  /** Model and performance mode change the whole pipeline, so they apply after a restart. */
+  setEngineSetting(key, value) {
+    if (this.settings.get(key) === value) return;
+    this.settings.set(key, value);
+    this.settings.flush();
+    app.relaunch();
+    app.exit(0);
+  }
+
+  setModel(modelId) {
+    if (MODELS[modelId]) this.setEngineSetting('modelId', modelId);
+  }
+
+  setPerformanceMode(mode) {
+    if (PERFORMANCE_MODES[mode]) this.setEngineSetting('performanceMode', mode);
   }
 
   get running() {
@@ -242,6 +269,8 @@ class ScreenBlurApp extends EventEmitter {
     this.settingsWindow = new SettingsWindow(this.config, {
       getState: () => this.settingsViewState(),
       setThresholdPercent: (percent) => this.setThresholdPercent(percent),
+      setModel: (modelId) => this.setModel(modelId),
+      setPerformanceMode: (mode) => this.setPerformanceMode(mode),
     });
   }
 
@@ -313,6 +342,7 @@ class ScreenBlurApp extends EventEmitter {
       overlayVisible: this.overlay.visible,
       blurredAreas: this.overlayEnabled && this.running ? this.regions.regions.length : 0,
       presets: SENSITIVITY_PRESETS,
+      modelName: this.engine.model.name,
     });
     this.updateSettingsWindow();
   }
@@ -322,7 +352,7 @@ class ScreenBlurApp extends EventEmitter {
   }
 
   settingsViewState() {
-    const { lastResult, thresholdPercent } = this.state;
+    const { lastResult, thresholdPercent, backend } = this.state;
     return {
       thresholdPercent,
       presets: SENSITIVITY_PRESETS,
@@ -330,6 +360,14 @@ class ScreenBlurApp extends EventEmitter {
       scorePercent: lastResult ? lastResult.score * 100 : null,
       overlayVisible: this.overlay.visible,
       running: this.running,
+      engine: {
+        modelId: this.engine.model.id,
+        models: Object.values(MODELS).map(({ id, name, description }) => ({ id, name, description })),
+        performanceMode: this.engine.mode.id,
+        performanceModes: Object.values(PERFORMANCE_MODES),
+        backend,
+        msPerFrame: lastResult ? Math.round(lastResult.latencyMs) : null,
+      },
     };
   }
 }

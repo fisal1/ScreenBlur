@@ -32,9 +32,10 @@ function describeLastResult(result, thresholdPercent) {
   return `Score ${Math.round(result.score * 100)}% (blurs at ${thresholdPercent}%)`;
 }
 
-function describeEngine(backend, result) {
-  if (!backend) return '';
-  return result ? `${backend}, ${Math.round(result.latencyMs)} ms/frame` : backend;
+function describeEngine(modelName, backend, result) {
+  if (!backend) return modelName ?? '';
+  const timing = result ? `, ${Math.round(result.latencyMs)} ms` : '';
+  return `${modelName} on ${backend}${timing}`;
 }
 
 function sensitivityMenu(state, actions) {
@@ -71,7 +72,7 @@ class TrayController {
       'ScreenBlur',
       describeStatus(state),
       describeLastResult(state.lastResult, state.thresholdPercent),
-      describeEngine(state.backend, state.lastResult),
+      describeEngine(state.modelName, state.backend, state.lastResult),
     ];
     // Windows truncates tray tooltips at 127 characters.
     this.tray.setToolTip(tooltip.filter(Boolean).join('\n').slice(0, 127));

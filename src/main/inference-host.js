@@ -1,4 +1,5 @@
 const { EventEmitter } = require('node:events');
+const path = require('node:path');
 const { utilityProcess, MessageChannelMain } = require('electron');
 const { WorkerMessage } = require('../shared/messages');
 
@@ -18,10 +19,14 @@ function sameBackend(a, b) {
  * Events: port(MessagePortMain), ready(msg), result(msg), error(msg), exit(code)
  */
 class InferenceHost extends EventEmitter {
-  /** @param backendMemory { load(): backend | null, save(backend), clear() } */
-  constructor(config, backendMemory) {
+  /**
+   * @param engine { model, backends } from engine-profile.js
+   * @param backendMemory { load(): backend | null, save(backend), clear() }
+   */
+  constructor(config, engine, backendMemory) {
     super();
     this.config = config;
+    this.engine = engine;
     this.backendMemory = backendMemory;
     this.child = null;
     this.inputSize = null;
@@ -50,7 +55,8 @@ class InferenceHost extends EventEmitter {
     this.child.postMessage(
       {
         type: WorkerMessage.INIT,
-        modelPath: this.config.paths.model,
+        modelId: this.engine.model.id,
+        modelPath: path.join(this.config.paths.modelsDir, this.engine.model.file),
         inputSize: this.inputSize,
         backends,
         selection,
@@ -71,7 +77,8 @@ class InferenceHost extends EventEmitter {
 
   /** Remembered backend first (load only it), otherwise measure them all. */
   backendPlan() {
-    const all = this.config.inference.backends;
+    const all = this.engine.backends;
+    if (all.length === 1) return { backends: all, selection: 'first-working' }; // nothing to measure
     const remembered = this.backendMemory.load();
     if (!remembered || !all.some((backend) => sameBackend(backend, remembered))) {
       return { backends: all, selection: 'fastest' };
@@ -92,7 +99,8 @@ class InferenceHost extends EventEmitter {
       this.reload();
       return true;
     }
-    if (!sameBackend(chosen, this.backendMemory.load())) this.backendMemory.clear(); // fell back; re-measure next time
+    const remembered = this.backendMemory.load();
+    if (remembered && !sameBackend(chosen, remembered)) this.backendMemory.clear(); // fell back; re-measure next time
     return false;
   }
 

@@ -141,3 +141,81 @@ input[type='range'] {
   font-size: 12px;
   text-align: center;
 }
+
+h2 {
+  margin: 18px 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.field-label {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.choice {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #2f4560;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.choice:hover {
+  border-color: var(--accent);
+}
+
+.choice.active {
+  border-color: var(--accent);
+  background: rgba(79, 195, 247, 0.12);
+}
+
+.choice-name {
+  font-weight: 600;
+}
+
+.choice-description {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.segmented {
+  display: flex;
+  gap: 8px;
+}
+
+.segmented button {
+  flex: 1;
+  padding: 8px 4px;
+  border: 1px solid #2f4560;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.segmented button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0b1520;
+  font-weight: 600;
+}

@@ -44,7 +44,8 @@ Electron binary and the model are also fetched on first run.
 
 On macOS and Linux use `./start.sh` with the same arguments.
 
-Test mode, safe to try without explicit content: faces are treated as targets and get blurred.
+Test mode, safe to try without explicit content: faces are treated as targets and get blurred
+(NudeNet only; the EraX models have no face class).
 
 ```powershell
 .\node_modules\electron\dist\electron.exe . --detect-faces --verbose
@@ -55,13 +56,38 @@ platform assumption above (the latter also lets Windows imitate macOS/Linux for 
 `--chromium-gpu` turns Chromium's GPU acceleration back on (off by default to save ~105 MB;
 the model still uses the GPU through ONNX Runtime).
 
-### Memory
+### Models and performance mode
 
-About 600 MB in total on the test laptop (private memory, all processes): ~365 MB for the
-model process (of which ~230 MB is the GPU driver for DirectML), ~100 MB for the hidden capture
-page, ~75 MB for the main process, the rest for the overlay page and Electron helpers. The
-fastest device is measured once and remembered, so later starts load only that device. Running
-the model on the CPU instead would save ~200 MB but drops to ~6 updates/s.
+Settings > Engine chooses the detection model and the performance mode (both restart the app):
+
+| Model | Detects | Time per check, RTX 3050 / CPU (light mode) |
+| :-- | :-- | :-- |
+| NudeNet 320n (default) | exposed body parts | 19 ms / 37 ms |
+| EraX nano | nipple, penis, vagina, anus, sexual activity | 16 ms / 36 ms |
+| EraX small | same, more accurate | 25 ms / 93 ms |
+
+| Mode | Device | Updates/s | Memory | CPU, video / still screen |
+| :-- | :-- | :-- | :-- | :-- |
+| Best (default) | GPU if available | ~27 | ~630-670 MB | ~7-8% / ~3-7% |
+| Light | CPU only | ~14 | ~310-350 MB | ~13% / ~5-8% |
+
+Measured on a Ryzen 7 4800H (16 threads) + RTX 3050 laptop; memory is private memory of all
+processes. In Best mode ~230 MB of it is the GPU driver for DirectML. The fastest device is
+measured once per model and remembered, so later starts load only that device.
+
+### Comparing models on your own images
+
+```powershell
+.\node_modules\electron\dist\electron.exe scripts\compare-models.js "C:\path\to\images" --out "C:\path\to\results"
+```
+
+Runs every model on each image as the app would see it on a 1920x1080 screen (`--alone` scores
+the image filling the model input instead) and prints each model's score, areas and speed, plus
+a summary of how many images each model would blur at `--threshold` (default 30). With `--out`
+it saves a side-by-side picture per image with each model's boxes, and `summary.csv`.
+Everything stays on your computer. The EraX models are converted from PyTorch with
+`uv run scripts/convert-erax.py` (already done; the converted files are downloaded by
+`scripts/fetch-model.js`).
 
 ## Build installers
 
@@ -81,8 +107,8 @@ them as a GitHub Release when a version tag (`v*`) is pushed. `build/icon.png` i
 1. A hidden window captures the primary display at the model input size (960x544 on 16:9) and
    sends each new frame as soon as the capture stream delivers it (up to 30 fps). The model runs
    on the fastest device found at startup (GPU via DirectML, CoreML or CUDA, otherwise CPU).
-2. The NudeNet detector finds exposed body parts; overlapping boxes are merged and each box is
-   padded by 20% so small movements don't expose its edges.
+2. The detection model (NudeNet or EraX, see Settings) finds explicit areas; overlapping boxes
+   are merged and each box is padded by 20% so small movements don't expose its edges.
 3. Each area is covered with the animated GIF in `assets/patch.gif` (cropped to fit). If that
    file is missing, the area gets a blur instead: a tiny averaged-color grid of what's
    underneath, drawn scaled up and blurred, so it can't be seen through. Replace
@@ -95,8 +121,7 @@ them as a GitHub Release when a version tag (`v*`) is pushed. `build/icon.png` i
    moving the patch at 60 fps, and stretches it to cover both where the content was and where it
    is predicted to be, so moving video stays covered.
 
-Measured on a Ryzen 7 4800H + RTX 3050 laptop: ~29 updates/s, ~18 ms per frame on the GPU
-(CPU only: ~6 updates/s).
+See "Models and performance mode" for measured speed, memory and CPU use.
 
 ## Controls
 
@@ -106,9 +131,10 @@ Measured on a Ryzen 7 4800H + RTX 3050 laptop: ~29 updates/s, ~18 ms per frame o
 | `Ctrl+Alt+W` | "This was wrong" - remove all blurred areas and block new ones for 10 s |
 | `Ctrl+Alt+O` | Show/hide a test patch in the middle of the screen |
 
-Left-click the tray icon (or choose **Settings...**) to open the settings window, where a slider
-sets the score (5-95%) at which an area is blurred, with a live meter of the highest score on
-screen. The setting is saved in `%APPDATA%\screenblur\settings.json`.
+Left-click the tray icon (or choose **Settings...**) to open the settings window: a slider sets
+the score (5-95%) at which an area is blurred, with a live meter of the highest score on screen,
+and the Engine section picks the model and performance mode. Settings are saved in
+`%APPDATA%\ScreenBlur\settings.json`.
 
 The tray menu also has sensitivity presets (Strict 20% / Balanced 30% / Relaxed 45%), snooze
 (5 / 15 / 60 min) and quit. Hovering over the tray icon shows how many areas are blurred.
@@ -128,7 +154,8 @@ src/
     inference-host.js     inference utility process lifecycle (auto-restart)
     overlay.js            capture-excluded, click-through overlay window
     tray.js, tray-icon.js tray menu and generated icons
-    settings-window.js    settings window (sensitivity slider, live score)
+    settings-window.js    settings window (sensitivity, live score, engine)
+    engine-profile.js     model + performance mode -> devices, input size, frame rate
     settings-store.js     saved settings (JSON in userData)
     hotkeys.js            global shortcuts
     self-test.js          Phase 0 checks
@@ -136,7 +163,8 @@ src/
     permissions.js        macOS Screen Recording permission prompt
   inference/              utility process
     worker.js             receives frames, runs the model, reports results
-    nudenet.js            NudeNet preprocessing, box decoding and NMS
+    models.js             the detection models (files, classes, which classes to blur)
+    yolo.js               YOLO preprocessing, box decoding and NMS
     regions.js            padding, screen-normalized boxes and blur mosaics
     backend-selector.js   picks the fastest execution provider (DirectML, CoreML, CUDA or CPU)
   renderer/
@@ -149,14 +177,17 @@ src/
     motion.js             motion prediction shared by the tracker and the overlay
 assets/patch.gif          GIF shown over detected areas
 docs/RFC.md               design document
-scripts/fetch-model.js    downloads and verifies the model
+scripts/fetch-model.js    downloads and verifies the models
+scripts/compare-models.js compares the models on your own images
+scripts/convert-erax.py   converts the EraX PyTorch weights to ONNX (uv run)
 scripts/after-pack.js     keeps only the packaged platform's ONNX Runtime binaries
 scripts/make-icon.js      draws build/icon.png
 build/icon.png            app icon (installers derive .ico/.icns from it)
 .github/workflows/        CI: test + build installers on Windows, macOS, Linux; release on tags
-scripts/score-image.js    diagnostic: score an image the way the app would
 test/                     unit tests (node:test)
-models/                   NudeNet 320n ONNX model (downloaded)
+models/                   ONNX models (downloaded)
+LICENSE                   AGPL-3.0
+THIRD_PARTY_NOTICES.md    licenses of the models, libraries and GIF
 tools/                    say.ps1 (speech updates); portable Node.js is downloaded here
 ```
 
@@ -172,7 +203,10 @@ tools/                    say.ps1 (speech updates); portable Node.js is download
 - Content animated on its own GPU layer (e.g. CSS `will-change: transform`) may not produce new
   capture frames on some systems, so it is checked only 2 times per second. Normal `<video>`
   playback was captured at the full rate in testing.
-- Without a usable GPU the model runs on the CPU at ~6 updates/s.
+- Without a usable GPU, or in light mode, the model runs on the CPU at ~14 updates/s.
+- Model accuracy on real explicit content has not been measured by the developers; use
+  `scripts/compare-models.js` on your own test images. In one test NudeNet flagged the app icon
+  (a pink circle) as exposed buttocks at 40%; the EraX models scored it 5%.
 - The detector finds body parts, so content without a clearly visible part may not be blurred.
 - Thresholds need tuning with real content. The Strict 20% preset can blur innocent things
   (in testing, hair in a close-up portrait scored 20%).
@@ -180,10 +214,9 @@ tools/                    say.ps1 (speech updates); portable Node.js is download
 - Images shown smaller than ~250 px tall may be missed. Raise `modelInput.longSide` in
   `src/main/config.js` for more detail at more CPU cost.
 
-## Diagnostics
+## License
 
-Score an image file the way the app would see it on screen and list the areas it would blur:
-
-```powershell
-.\node_modules\electron\dist\electron.exe scripts\score-image.js "C:\path\to\image.jpg" --screen 1920x1080
-```
+ScreenBlur is free software under the [GNU AGPL v3.0 or later](LICENSE): you can use, change and
+share it, and anyone who distributes it (or runs a modified version as a network service) must
+share their source code under the same license. The bundled models and libraries have their own
+licenses, listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

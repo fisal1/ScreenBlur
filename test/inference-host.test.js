@@ -13,7 +13,8 @@ const { InferenceHost, sameBackend } = require('../src/main/inference-host');
 Module._load = originalLoad;
 
 const BACKENDS = [{ name: 'dml', deviceId: 0 }, { name: 'dml', deviceId: 1 }, { name: 'cpu' }];
-const config = { inference: { backends: BACKENDS } };
+const config = {};
+const engine = { backends: BACKENDS, model: { id: 'test-model', file: 'test.onnx' } };
 
 function memory(initial = null) {
   let value = initial;
@@ -28,25 +29,25 @@ test('sameBackend compares name and device', () => {
 });
 
 test('without a remembered backend all backends are measured', () => {
-  const host = new InferenceHost(config, memory());
+  const host = new InferenceHost(config, engine, memory());
   assert.deepEqual(host.backendPlan(), { backends: BACKENDS, selection: 'fastest' });
 });
 
 test('a remembered backend is tried first and alone unless it fails', () => {
-  const host = new InferenceHost(config, memory({ name: 'dml', deviceId: 1 }));
+  const host = new InferenceHost(config, engine, memory({ name: 'dml', deviceId: 1 }));
   const plan = host.backendPlan();
   assert.equal(plan.selection, 'first-working');
   assert.deepEqual(plan.backends, [{ name: 'dml', deviceId: 1 }, { name: 'dml', deviceId: 0 }, { name: 'cpu' }]);
 });
 
 test('a remembered backend that is no longer offered is ignored', () => {
-  const host = new InferenceHost(config, memory({ name: 'coreml' }));
+  const host = new InferenceHost(config, engine, memory({ name: 'coreml' }));
   assert.equal(host.backendPlan().selection, 'fastest');
 });
 
 test('after measuring, the winner is remembered and the worker reloaded', () => {
   const remembered = memory();
-  const host = new InferenceHost(config, remembered);
+  const host = new InferenceHost(config, engine, remembered);
   let reloaded = false;
   host.reload = () => { reloaded = true; };
   host.selection = 'fastest';
@@ -57,7 +58,7 @@ test('after measuring, the winner is remembered and the worker reloaded', () => 
 
 test('falling back from the remembered backend forgets it so the next start re-measures', () => {
   const remembered = memory({ name: 'dml', deviceId: 1 });
-  const host = new InferenceHost(config, remembered);
+  const host = new InferenceHost(config, engine, remembered);
   host.selection = 'first-working';
   assert.equal(host.handleReady({ backend: { name: 'cpu' } }), false);
   assert.equal(remembered.load(), null);
@@ -65,8 +66,17 @@ test('falling back from the remembered backend forgets it so the next start re-m
 
 test('loading the remembered backend keeps it', () => {
   const remembered = memory({ name: 'dml', deviceId: 1 });
-  const host = new InferenceHost(config, remembered);
+  const host = new InferenceHost(config, engine, remembered);
   host.selection = 'first-working';
   assert.equal(host.handleReady({ backend: { name: 'dml', deviceId: 1 } }), false);
   assert.deepEqual(remembered.load(), { name: 'dml', deviceId: 1 });
+});
+
+test('a single backend (light mode) is loaded directly and never remembered', () => {
+  const remembered = memory();
+  const host = new InferenceHost(config, { ...engine, backends: [{ name: 'cpu' }] }, remembered);
+  assert.deepEqual(host.backendPlan(), { backends: [{ name: 'cpu' }], selection: 'first-working' });
+  host.selection = 'first-working';
+  assert.equal(host.handleReady({ backend: { name: 'cpu' } }), false);
+  assert.equal(remembered.load(), null);
 });

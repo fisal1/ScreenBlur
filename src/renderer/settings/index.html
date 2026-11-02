@@ -33,7 +33,17 @@
         <p id="status" class="hint">Waiting for the first result...</p>
       </section>
 
-      <p class="footnote">Changes apply immediately and are saved.</p>
+      <h2>Engine</h2>
+      <section class="card">
+        <p class="field-label">Detection model</p>
+        <div id="models" class="choices" role="radiogroup" aria-label="Detection model"></div>
+        <p class="field-label">Performance</p>
+        <div id="modes" class="segmented" role="radiogroup" aria-label="Performance mode"></div>
+        <p id="engine-status" class="hint"></p>
+        <p class="hint">Changing the model or performance restarts ScreenBlur.</p>
+      </section>
+
+      <p class="footnote">Sensitivity applies immediately. All settings are saved.</p>
     </main>
     <script src="settings.js"></script>
   </body>

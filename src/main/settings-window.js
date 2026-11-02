@@ -1,18 +1,30 @@
-const { BrowserWindow, ipcMain } = require('electron');
+const { BrowserWindow, ipcMain, screen } = require('electron');
 const { IpcChannel } = require('../shared/messages');
 
+const WINDOW_WIDTH = 460;
+const CONTENT_HEIGHT = 880; // the page scrolls when the screen is smaller
+
 /**
- * Settings window with the sensitivity slider and a live score meter.
- * `getState()` supplies what the page shows; `setThresholdPercent(percent)` applies a change.
+ * Settings window: sensitivity slider with a live score meter, and the detection engine
+ * (model and performance mode). `getState()` supplies what the page shows; the other
+ * callbacks apply changes.
  */
 class SettingsWindow {
-  constructor(config, { getState, setThresholdPercent }) {
+  constructor(config, { getState, setThresholdPercent, setModel, setPerformanceMode }) {
     this.config = config;
     this.window = null;
     this.onGet = (event) => (this.isFromWindow(event) ? getState() : null);
-    this.onSetThreshold = (event, percent) => this.isFromWindow(event) && setThresholdPercent(percent);
+    // Channel -> handler; each only accepts messages from our own settings page.
+    this.listeners = {
+      [IpcChannel.SETTINGS_SET_THRESHOLD]: setThresholdPercent,
+      [IpcChannel.SETTINGS_SET_MODEL]: setModel,
+      [IpcChannel.SETTINGS_SET_PERFORMANCE_MODE]: setPerformanceMode,
+    };
+    this.guarded = Object.fromEntries(
+      Object.entries(this.listeners).map(([channel, handler]) => [channel, (event, value) => this.isFromWindow(event) && handler(value)]),
+    );
     ipcMain.handle(IpcChannel.SETTINGS_GET, this.onGet);
-    ipcMain.on(IpcChannel.SETTINGS_SET_THRESHOLD, this.onSetThreshold);
+    for (const [channel, listener] of Object.entries(this.guarded)) ipcMain.on(channel, listener);
   }
 
   open() {
@@ -21,9 +33,10 @@ class SettingsWindow {
       this.window.focus();
       return;
     }
+    const workArea = screen.getPrimaryDisplay().workAreaSize;
     this.window = new BrowserWindow({
-      width: 460,
-      height: 450,
+      width: WINDOW_WIDTH,
+      height: Math.min(CONTENT_HEIGHT, workArea.height - 60),
       useContentSize: true,
       resizable: false,
       maximizable: false,
@@ -50,7 +63,7 @@ class SettingsWindow {
 
   destroy() {
     ipcMain.removeHandler(IpcChannel.SETTINGS_GET);
-    ipcMain.off(IpcChannel.SETTINGS_SET_THRESHOLD, this.onSetThreshold);
+    for (const [channel, listener] of Object.entries(this.guarded)) ipcMain.off(channel, listener);
     this.window?.destroy();
     this.window = null;
   }

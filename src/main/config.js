@@ -15,7 +15,7 @@ const config = Object.freeze({
 
   paths: Object.freeze({
     root: ROOT,
-    model: path.join(RESOURCES, 'models', '320n.onnx'),
+    modelsDir: path.join(RESOURCES, 'models'), // files listed in src/inference/models.js
     inferenceWorker: path.join(SRC, 'inference', 'worker.js'),
     capturePage: path.join(SRC, 'renderer', 'capture', 'index.html'),
     capturePreload: path.join(SRC, 'renderer', 'capture', 'preload.js'),

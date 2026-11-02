@@ -47,9 +47,10 @@ class CaptureHost extends EventEmitter {
     this.window.webContents.postMessage(IpcChannel.INFERENCE_PORT, null, [port]);
   }
 
-  async open(display, inputSize) {
+  /** @param settings capture settings (config.capture, adjusted for the engine) plus inputSize */
+  async open(display, settings) {
     const sourceId = await findScreenSourceId(display);
-    this.sendCommand({ type: CaptureCommand.OPEN, sourceId, settings: { ...this.config.capture, inputSize } });
+    this.sendCommand({ type: CaptureCommand.OPEN, sourceId, settings });
   }
 
   pause() {

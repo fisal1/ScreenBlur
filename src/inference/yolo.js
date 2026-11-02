@@ -1,26 +1,7 @@
-// NudeNet v3 detector: input preprocessing and output decoding.
-// Output tensor shape is [1, 4 + LABELS.length, anchors]: per anchor a box (cx, cy, w, h in
+// YOLO detector input preprocessing and output decoding (NudeNet and EraX share the format).
+// Output tensor shape is [1, 4 + labels.length, anchors]: per anchor a box (cx, cy, w, h in
 // input pixels) followed by one confidence per class.
 const { iou } = require('../shared/geometry');
-
-const LABELS = Object.freeze([
-  'FEMALE_GENITALIA_COVERED', 'FACE_FEMALE', 'BUTTOCKS_EXPOSED', 'FEMALE_BREAST_EXPOSED',
-  'FEMALE_GENITALIA_EXPOSED', 'MALE_BREAST_EXPOSED', 'ANUS_EXPOSED', 'FEET_EXPOSED',
-  'BELLY_COVERED', 'FEET_COVERED', 'ARMPITS_COVERED', 'ARMPITS_EXPOSED', 'FACE_MALE',
-  'BELLY_EXPOSED', 'MALE_GENITALIA_EXPOSED', 'ANUS_COVERED', 'FEMALE_BREAST_COVERED',
-  'BUTTOCKS_COVERED',
-]);
-
-const EXPLICIT_LABELS = Object.freeze([
-  'BUTTOCKS_EXPOSED',
-  'FEMALE_BREAST_EXPOSED',
-  'FEMALE_GENITALIA_EXPOSED',
-  'ANUS_EXPOSED',
-  'MALE_GENITALIA_EXPOSED',
-]);
-
-// Safe stand-ins used by the --detect-faces test mode.
-const FACE_LABELS = Object.freeze(['FACE_FEMALE', 'FACE_MALE']);
 
 const BOX_CHANNELS = 4;
 
@@ -29,16 +10,6 @@ const DEFAULT_DETECTION_OPTIONS = Object.freeze({
   iouThreshold: 0.45, // NMS overlap above which the weaker box is dropped
   maxDetections: 20,
 });
-
-function classIdsFor(labels) {
-  return labels.map((label) => {
-    const id = LABELS.indexOf(label);
-    if (id < 0) throw new Error(`Unknown NudeNet label ${label}`);
-    return id;
-  });
-}
-
-const EXPLICIT_CLASS_IDS = classIdsFor(EXPLICIT_LABELS);
 
 /** Converts RGBA pixels into a normalized NCHW float tensor buffer. */
 function rgbaToNchw(rgba, width, height, out = new Float32Array(3 * width * height)) {
@@ -51,10 +22,10 @@ function rgbaToNchw(rgba, width, height, out = new Float32Array(3 * width * heig
   return out;
 }
 
-function anchorCount(output) {
+function anchorCount(output, labels) {
   const [, channels, anchors] = output.dims;
-  if (channels !== BOX_CHANNELS + LABELS.length) {
-    throw new Error(`Unexpected NudeNet output shape [${output.dims}]`);
+  if (channels !== BOX_CHANNELS + labels.length) {
+    throw new Error(`Unexpected model output shape [${output.dims}] for ${labels.length} classes`);
   }
   return anchors;
 }
@@ -82,9 +53,9 @@ function nonMaxSuppression(candidates, iouThreshold, maxDetections) {
  * Returns the frame score (highest target confidence anywhere) and de-duplicated
  * detections with boxes in model input pixels.
  */
-function analyze(output, classIds, options = {}) {
+function analyze(output, labels, classIds, options = {}) {
   const { minScore, iouThreshold, maxDetections } = { ...DEFAULT_DETECTION_OPTIONS, ...options };
-  const anchors = anchorCount(output);
+  const anchors = anchorCount(output, labels);
   const { data } = output;
 
   let score = 0;
@@ -102,26 +73,20 @@ function analyze(output, classIds, options = {}) {
     }
     if (bestScore > score) {
       score = bestScore;
-      label = LABELS[bestClass];
+      label = labels[bestClass];
     }
     if (bestScore >= minScore) {
-      candidates.push({ score: bestScore, label: LABELS[bestClass], box: decodeBox(data, anchor, anchors) });
+      candidates.push({ score: bestScore, label: labels[bestClass], box: decodeBox(data, anchor, anchors) });
     }
   }
 
   return { score, label, detections: nonMaxSuppression(candidates, iouThreshold, maxDetections) };
 }
 
-/** Highest explicit-class confidence across all anchors. */
-function scoreExplicit(output) {
-  const { score, label } = analyze(output, EXPLICIT_CLASS_IDS, { minScore: Infinity });
-  return { score, label };
-}
-
 /** Highest confidence per class, sorted descending (diagnostics). */
-function classConfidences(output) {
-  const anchors = anchorCount(output);
-  return LABELS.map((label, classId) => {
+function classConfidences(output, labels) {
+  const anchors = anchorCount(output, labels);
+  return labels.map((label, classId) => {
     const offset = (BOX_CHANNELS + classId) * anchors;
     let max = 0;
     for (let anchor = 0; anchor < anchors; anchor++) max = Math.max(max, output.data[offset + anchor]);
@@ -129,13 +94,4 @@ function classConfidences(output) {
   }).sort((a, b) => b.score - a.score);
 }
 
-module.exports = {
-  LABELS,
-  EXPLICIT_LABELS,
-  FACE_LABELS,
-  classIdsFor,
-  rgbaToNchw,
-  analyze,
-  scoreExplicit,
-  classConfidences,
-};
+module.exports = { rgbaToNchw, analyze, classConfidences };
