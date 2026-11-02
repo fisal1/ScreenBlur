@@ -101,6 +101,7 @@ const config = Object.freeze({
     selfTest: process.argv.includes('--selftest'),
     verbose: process.argv.includes('--verbose'), // "--debug" is reserved by Electron
     detectFaces: process.argv.includes('--detect-faces'), // test mode: blur faces too (safe to test with)
+    chromiumGpu: process.argv.includes('--chromium-gpu'), // re-enable Chromium GPU acceleration (off to save memory)
   }),
 });
 

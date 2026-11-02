@@ -38,7 +38,7 @@ class ScreenBlurApp extends EventEmitter {
     const thresholdPercent = clampThresholdPercent(this.settings.get('thresholdPercent'));
 
     this.regions = new RegionTracker({ ...config.regionTracking, ...thresholdsFromPercent(thresholdPercent) });
-    this.inference = new InferenceHost(config);
+    this.inference = new InferenceHost(config, this.createBackendMemory());
     this.capture = new CaptureHost(config);
     this.overlay = new OverlayManager(config);
     this.tray = null;
@@ -97,6 +97,22 @@ class ScreenBlurApp extends EventEmitter {
     this.overlay.destroy();
     this.settingsWindow?.destroy();
     this.tray?.destroy();
+  }
+
+  /**
+   * Remembers the fastest inference backend in the settings file, per app version (an update
+   * may change what's fastest), so later starts load only that one (see inference-host.js).
+   */
+  createBackendMemory() {
+    const appVersion = app.getVersion();
+    return {
+      load: () => {
+        const saved = this.settings.get('inferenceBackend');
+        return saved?.appVersion === appVersion ? { name: saved.name, deviceId: saved.deviceId } : null;
+      },
+      save: (backend) => this.settings.set('inferenceBackend', { ...backend, appVersion }),
+      clear: () => this.settings.set('inferenceBackend', null),
+    };
   }
 
   get running() {

@@ -9,7 +9,10 @@ function selfTestConfig(config) {
 }
 
 /** Command-line switches that must be set before the app is ready. */
-function applyPlatformSwitches(platform) {
+function applyPlatformSwitches(platform, flags) {
+  // Chromium's GPU process cost ~105 MB for no measurable gain: with it off, capture still ran
+  // at ~27 fps with the same CPU use (the model keeps its own GPU through ONNX Runtime).
+  if (!flags.chromiumGpu) app.disableHardwareAcceleration();
   if (!platform.isWayland) return;
   // Native Wayland doesn't let apps place always-on-top, click-through windows, so the overlay
   // runs through XWayland. Screen capture still goes through the PipeWire portal.
@@ -35,7 +38,7 @@ async function main() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  applyPlatformSwitches(baseConfig.platform);
+  applyPlatformSwitches(baseConfig.platform, baseConfig.flags);
   // Tray app: keep running with no visible windows.
   app.on('window-all-closed', () => {});
   main().catch((err) => {

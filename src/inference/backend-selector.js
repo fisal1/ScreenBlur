@@ -71,4 +71,27 @@ async function createFastestSession(ort, modelPath, inputSize, backends, runs) {
   return { ...best, attempts };
 }
 
-module.exports = { createFastestSession, describeBackend };
+/**
+ * Loads the first backend that works, in order, without trying the rest. Used once the fastest
+ * backend is known: every backend that is loaded keeps some driver memory even after release.
+ * @returns same shape as createFastestSession
+ */
+async function createFirstWorkingSession(ort, modelPath, inputSize, backends, runs) {
+  const attempts = [];
+  for (const backend of backends) {
+    const label = describeBackend(backend);
+    let session;
+    try {
+      session = await ort.InferenceSession.create(modelPath, sessionOptions(backend));
+      const medianMs = await timeRuns(ort, session, inputSize, runs);
+      attempts.push({ label, medianMs });
+      return { session, backend, label, medianMs, attempts };
+    } catch (err) {
+      attempts.push({ label, error: String(err?.message ?? err).slice(0, 120) });
+      await session?.release();
+    }
+  }
+  throw new Error(`No execution provider worked: ${JSON.stringify(attempts)}`);
+}
+
+module.exports = { createFastestSession, createFirstWorkingSession, describeBackend };

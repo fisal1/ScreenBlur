@@ -5,7 +5,7 @@ const ort = require('onnxruntime-node');
 const { WorkerMessage } = require('../shared/messages');
 const { EXPLICIT_LABELS, FACE_LABELS, classIdsFor, rgbaToNchw, analyze } = require('./nudenet');
 const { toScreenRegions } = require('./regions');
-const { createFastestSession } = require('./backend-selector');
+const { createFastestSession, createFirstWorkingSession } = require('./backend-selector');
 
 const MODEL_ID = 'nudenet-320n';
 const MODEL_STRIDE = 32;
@@ -13,15 +13,20 @@ const parentPort = process.parentPort;
 
 ort.env.logLevel = 'error';
 
+const SELECTORS = Object.freeze({
+  fastest: createFastestSession, // measure every backend (first launch)
+  'first-working': createFirstWorkingSession, // the fastest one is already known
+});
+
 class Detector {
-  static async load({ modelPath, inputSize, backends, benchmarkRuns }, classIds) {
-    const selection = await createFastestSession(ort, modelPath, inputSize, backends, benchmarkRuns);
-    return new Detector(selection, classIds);
+  static async load({ modelPath, inputSize, backends, selection, benchmarkRuns }, classIds) {
+    const select = SELECTORS[selection] ?? createFastestSession;
+    return new Detector(await select(ort, modelPath, inputSize, backends, benchmarkRuns), classIds);
   }
 
-  constructor({ session, label, medianMs, attempts }, classIds) {
+  constructor({ session, backend, label, medianMs, attempts }, classIds) {
     this.session = session;
-    this.backend = { label, medianMs, attempts };
+    this.backend = { ...backend, label, medianMs, attempts };
     this.classIds = classIds;
     this.inputName = session.inputNames[0];
     this.outputName = session.outputNames[0];

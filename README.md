@@ -52,6 +52,16 @@ Test mode, safe to try without explicit content: faces are treated as targets an
 
 Other flags: `--overlay-hidden-from-capture` / `--overlay-visible-to-capture` override the
 platform assumption above (the latter also lets Windows imitate macOS/Linux for testing).
+`--chromium-gpu` turns Chromium's GPU acceleration back on (off by default to save ~105 MB;
+the model still uses the GPU through ONNX Runtime).
+
+### Memory
+
+About 600 MB in total on the test laptop (private memory, all processes): ~365 MB for the
+model process (of which ~230 MB is the GPU driver for DirectML), ~100 MB for the hidden capture
+page, ~75 MB for the main process, the rest for the overlay page and Electron helpers. The
+fastest device is measured once and remembered, so later starts load only that device. Running
+the model on the CPU instead would save ~200 MB but drops to ~6 updates/s.
 
 ## Build installers
 
