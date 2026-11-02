@@ -68,9 +68,11 @@ class InferenceHost extends EventEmitter {
     this.emit('port', rendererPort);
   }
 
+  /** Stops the worker; messages it sends while shutting down are ignored. */
   stop() {
     this.stopping = true;
     clearTimeout(this.restartTimer);
+    this.child?.removeAllListeners('message');
     this.child?.kill();
     this.child = null;
   }

@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { BrowserWindow } = require('electron');
 const { IpcChannel } = require('../shared/messages');
+const { isAlive } = require('./window-utils');
 
 /**
  * Creates a borderless, click-through, always-on-top window covering `bounds`.
@@ -86,7 +87,7 @@ class OverlayManager {
   }
 
   get visible() {
-    return Boolean(this.window?.isVisible());
+    return isAlive(this.window) && this.window.isVisible();
   }
 
   /**
@@ -94,7 +95,7 @@ class OverlayManager {
    * when there are none.
    */
   render(regions) {
-    if (!this.window) return;
+    if (!isAlive(this.window)) return;
     const { renderDelayMs, maxLeadMs } = this.config.regionTracking;
     this.window.webContents.send(IpcChannel.OVERLAY_RENDER, {
       regions: regions.map(({ id, box, velocity, capturedAt, mosaic }) => ({ id, box, velocity, capturedAt, mosaic })),
@@ -108,16 +109,16 @@ class OverlayManager {
   }
 
   setBounds(display) {
-    this.window?.setBounds(display.bounds);
+    if (isAlive(this.window)) this.window.setBounds(display.bounds);
   }
 
   destroy() {
-    this.window?.destroy();
+    if (isAlive(this.window)) this.window.destroy();
     this.window = null;
   }
 
   setVisible(visible) {
-    if (visible === this.visible) return;
+    if (!isAlive(this.window) || visible === this.visible) return;
     if (visible) {
       this.window.showInactive();
       this.window.moveTop();

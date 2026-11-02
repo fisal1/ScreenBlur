@@ -1,6 +1,7 @@
 const { EventEmitter } = require('node:events');
 const { BrowserWindow, desktopCapturer, ipcMain } = require('electron');
 const { CaptureCommand, IpcChannel } = require('../shared/messages');
+const { isAlive } = require('./window-utils');
 
 const PROBE_TIMEOUT_MS = 3000;
 
@@ -44,7 +45,7 @@ class CaptureHost extends EventEmitter {
   }
 
   attachInferencePort(port) {
-    this.window.webContents.postMessage(IpcChannel.INFERENCE_PORT, null, [port]);
+    if (isAlive(this.window)) this.window.webContents.postMessage(IpcChannel.INFERENCE_PORT, null, [port]);
   }
 
   /** @param settings capture settings (config.capture, adjusted for the engine) plus inputSize */
@@ -85,16 +86,16 @@ class CaptureHost extends EventEmitter {
   destroy() {
     ipcMain.off(IpcChannel.CAPTURE_STATUS, this.onStatus);
     ipcMain.off(IpcChannel.PROBE_RESULT, this.onProbeResult);
-    this.window?.destroy();
+    if (isAlive(this.window)) this.window.destroy();
     this.window = null;
   }
 
   sendCommand(command) {
-    this.window?.webContents.send(IpcChannel.CAPTURE_COMMAND, command);
+    if (isAlive(this.window)) this.window.webContents.send(IpcChannel.CAPTURE_COMMAND, command);
   }
 
   isFromWindow(event) {
-    return this.window && event.sender === this.window.webContents;
+    return isAlive(this.window) && event.sender === this.window.webContents;
   }
 
   resolveProbe({ id, fraction }) {

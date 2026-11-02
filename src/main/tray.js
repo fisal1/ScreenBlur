@@ -67,6 +67,7 @@ class TrayController {
   }
 
   update(state) {
+    if (this.tray.isDestroyed()) return; // quitting
     this.tray.setImage(this.iconFor(pickIconColor(state)));
     const tooltip = [
       'ScreenBlur',
@@ -85,7 +86,7 @@ class TrayController {
   }
 
   destroy() {
-    this.tray.destroy();
+    if (!this.tray.isDestroyed()) this.tray.destroy();
   }
 
   iconFor(color) {

@@ -54,6 +54,7 @@ class ScreenBlurApp extends EventEmitter {
     this.display = null;
     this.timers = { snooze: null, trayRefresh: null };
     this.lastMaskKey = null;
+    this.stopped = false;
 
     this.state = {
       enabled: true,
@@ -95,7 +96,13 @@ class ScreenBlurApp extends EventEmitter {
     explainScreenRecordingPermission().catch((err) => console.error('[permissions]', err));
   }
 
+  /**
+   * Shuts down in dependency order: stop the inference worker (and stop listening to it) before
+   * destroying the windows its results would update. Safe to call more than once.
+   */
   stop() {
+    if (this.stopped) return;
+    this.stopped = true;
     clearTimeout(this.timers.snooze);
     clearInterval(this.timers.trayRefresh);
     unregisterHotkeys();
@@ -129,7 +136,7 @@ class ScreenBlurApp extends EventEmitter {
   setEngineSetting(key, value) {
     if (this.settings.get(key) === value) return;
     this.settings.set(key, value);
-    this.settings.flush();
+    this.stop(); // also saves the settings
     app.relaunch();
     app.exit(0);
   }
@@ -217,6 +224,7 @@ class ScreenBlurApp extends EventEmitter {
       if (code === 'MODEL_NOT_LOADED') this.setError('model failed to load');
     });
     this.inference.on('exit', (code) => {
+      if (this.stopped) return;
       console.error(`[inference] exited with code ${code}, restarting`);
       this.state.ready = false;
       this.refresh();
@@ -224,6 +232,7 @@ class ScreenBlurApp extends EventEmitter {
   }
 
   handleResult(result) {
+    if (this.stopped) return;
     this.state.lastResult = result;
     this.emit('result', result);
     this.updateSettingsWindow();
@@ -306,6 +315,7 @@ class ScreenBlurApp extends EventEmitter {
 
   /** Applies the running state to capture and the overlay after any state change. */
   refresh() {
+    if (this.stopped) return;
     if (this.running) {
       this.capture.resume();
     } else {
@@ -316,6 +326,7 @@ class ScreenBlurApp extends EventEmitter {
   }
 
   updateOverlay() {
+    if (this.stopped) return;
     if (this.state.testOverlay) {
       this.overlay.renderTestRegion();
     } else {
@@ -336,6 +347,7 @@ class ScreenBlurApp extends EventEmitter {
   }
 
   updateTray() {
+    if (this.stopped) return;
     this.tray?.update({
       ...this.state,
       running: this.running,

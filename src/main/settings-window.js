@@ -1,5 +1,6 @@
 const { BrowserWindow, ipcMain, screen } = require('electron');
 const { IpcChannel } = require('../shared/messages');
+const { isAlive } = require('./window-utils');
 
 const WINDOW_WIDTH = 460;
 const CONTENT_HEIGHT = 880; // the page scrolls when the screen is smaller
@@ -28,7 +29,7 @@ class SettingsWindow {
   }
 
   open() {
-    if (this.window) {
+    if (isAlive(this.window)) {
       this.window.show();
       this.window.focus();
       return;
@@ -58,18 +59,18 @@ class SettingsWindow {
 
   /** Sends fresh state to the page if the window is open. */
   update(state) {
-    this.window?.webContents.send(IpcChannel.SETTINGS_UPDATE, state);
+    if (isAlive(this.window)) this.window.webContents.send(IpcChannel.SETTINGS_UPDATE, state);
   }
 
   destroy() {
     ipcMain.removeHandler(IpcChannel.SETTINGS_GET);
     for (const [channel, listener] of Object.entries(this.guarded)) ipcMain.off(channel, listener);
-    this.window?.destroy();
+    if (isAlive(this.window)) this.window.destroy();
     this.window = null;
   }
 
   isFromWindow(event) {
-    return this.window && event.sender === this.window.webContents;
+    return isAlive(this.window) && event.sender === this.window.webContents;
   }
 }
 
