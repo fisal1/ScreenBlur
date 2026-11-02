@@ -24,14 +24,17 @@ class InferenceHost extends EventEmitter {
     this.stopping = false;
     const { port1: rendererPort, port2: workerPort } = new MessageChannelMain();
 
-    this.child = utilityProcess.fork(this.config.paths.inferenceWorker, [], {
+    const child = utilityProcess.fork(this.config.paths.inferenceWorker, [], {
       serviceName: 'ScreenBlur Inference',
       stdio: 'inherit',
     });
-    this.child.on('message', (message) => this.emit(message.type, message));
-    this.child.on('exit', (code) => this.handleExit(code));
+    this.child = child;
+    child.on('message', (message) => {
+      if (this.child === child) this.emit(message.type, message);
+    });
+    child.on('exit', (code) => this.handleExit(code, child));
 
-    this.child.postMessage(
+    child.postMessage(
       {
         type: WorkerMessage.INIT,
         modelPath: this.config.paths.model,
@@ -48,11 +51,13 @@ class InferenceHost extends EventEmitter {
   stop() {
     this.stopping = true;
     clearTimeout(this.restartTimer);
-    this.child?.kill();
+    const child = this.child;
     this.child = null;
+    child?.kill();
   }
 
-  handleExit(code) {
+  handleExit(code, child = this.child) {
+    if (this.child !== child) return;
     this.child = null;
     this.emit('exit', code);
     if (this.stopping) return;

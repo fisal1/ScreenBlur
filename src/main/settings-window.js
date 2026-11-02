@@ -6,13 +6,16 @@ const { IpcChannel } = require('../shared/messages');
  * `getState()` supplies what the page shows; `setThresholdPercent(percent)` applies a change.
  */
 class SettingsWindow {
-  constructor(config, { getState, setThresholdPercent }) {
+  constructor(config, { getState, setThresholdPercent, setRemoteInference }) {
     this.config = config;
     this.window = null;
     this.onGet = (event) => (this.isFromWindow(event) ? getState() : null);
     this.onSetThreshold = (event, percent) => this.isFromWindow(event) && setThresholdPercent(percent);
+    this.onSetRemoteInference = (event, settings) =>
+      this.isFromWindow(event) ? setRemoteInference(settings) : { ok: false, error: 'Untrusted settings window' };
     ipcMain.handle(IpcChannel.SETTINGS_GET, this.onGet);
     ipcMain.on(IpcChannel.SETTINGS_SET_THRESHOLD, this.onSetThreshold);
+    ipcMain.handle(IpcChannel.SETTINGS_SET_REMOTE, this.onSetRemoteInference);
   }
 
   open() {
@@ -23,7 +26,7 @@ class SettingsWindow {
     }
     this.window = new BrowserWindow({
       width: 460,
-      height: 450,
+      height: 740,
       useContentSize: true,
       resizable: false,
       maximizable: false,
@@ -50,6 +53,7 @@ class SettingsWindow {
 
   destroy() {
     ipcMain.removeHandler(IpcChannel.SETTINGS_GET);
+    ipcMain.removeHandler(IpcChannel.SETTINGS_SET_REMOTE);
     ipcMain.off(IpcChannel.SETTINGS_SET_THRESHOLD, this.onSetThreshold);
     this.window?.destroy();
     this.window = null;

@@ -36,15 +36,34 @@ async function open({ sourceId, settings }) {
   video.srcObject = stream;
   await video.play();
 
-  pipeline = new CapturePipeline(new FrameSampler(video, settings), settings, { WorkerMessage, onError: reportError });
+  pipeline = new CapturePipeline(new FrameSampler(video, settings), settings, {
+    WorkerMessage,
+    onError: reportError,
+    onResult: (result) => window.screenblur.reportInferenceResult(result),
+    onInferenceState: (state, detail) => window.screenblur.reportInferenceState({ state, detail }),
+  });
   if (pendingPort) pipeline.setPort(pendingPort);
+  if (settings.remote?.enabled) pipeline.setRemote(settings.remote);
   pipeline.setMask(pendingMask);
   if (resumeRequested) pipeline.resume();
   window.screenblur.reportStatus('info', `capturing ${video.videoWidth}x${video.videoHeight}`);
 }
 
+function configureInference(remote) {
+  if (!pipeline) return;
+  if (remote?.enabled) {
+    pendingPort?.close();
+    pendingPort = null;
+    pipeline.setRemote(remote);
+    return;
+  }
+  pipeline.setRemote(null);
+  if (pendingPort) pipeline.setPort(pendingPort);
+}
+
 const commandHandlers = {
   [CaptureCommand.OPEN]: (command) => open(command),
+  [CaptureCommand.CONFIGURE_INFERENCE]: ({ remote }) => configureInference(remote),
   [CaptureCommand.RESUME]: () => {
     resumeRequested = true;
     pipeline?.resume();

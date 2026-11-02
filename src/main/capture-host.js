@@ -12,10 +12,10 @@ async function findScreenSourceId(display) {
 }
 
 /**
- * Owns the hidden capture renderer, which grabs screen frames and streams them
- * straight to the inference worker over a MessagePort.
+ * Owns the hidden capture renderer, which grabs screen frames and forwards them
+ * to the selected inference transport.
  *
- * Events: status({ level, message })
+ * Events: status({ level, message }), result(msg), inference-state(state)
  */
 class CaptureHost extends EventEmitter {
   constructor(config) {
@@ -26,6 +26,8 @@ class CaptureHost extends EventEmitter {
     this.nextProbeId = 1;
     this.onStatus = (event, status) => this.isFromWindow(event) && this.emit('status', status);
     this.onProbeResult = (event, result) => this.isFromWindow(event) && this.resolveProbe(result);
+    this.onInferenceResult = (event, result) => this.isFromWindow(event) && this.emit('result', result);
+    this.onInferenceState = (event, state) => this.isFromWindow(event) && this.emit('inference-state', state);
   }
 
   async create() {
@@ -40,6 +42,8 @@ class CaptureHost extends EventEmitter {
     });
     ipcMain.on(IpcChannel.CAPTURE_STATUS, this.onStatus);
     ipcMain.on(IpcChannel.PROBE_RESULT, this.onProbeResult);
+    ipcMain.on(IpcChannel.CAPTURE_RESULT, this.onInferenceResult);
+    ipcMain.on(IpcChannel.CAPTURE_INFERENCE_STATE, this.onInferenceState);
     await this.window.loadFile(this.config.paths.capturePage);
   }
 
@@ -47,9 +51,17 @@ class CaptureHost extends EventEmitter {
     this.window.webContents.postMessage(IpcChannel.INFERENCE_PORT, null, [port]);
   }
 
-  async open(display, inputSize) {
+  async open(display, inputSize, remote = null) {
     const sourceId = await findScreenSourceId(display);
-    this.sendCommand({ type: CaptureCommand.OPEN, sourceId, settings: { ...this.config.capture, inputSize } });
+    this.sendCommand({
+      type: CaptureCommand.OPEN,
+      sourceId,
+      settings: { ...this.config.capture, inputSize, remote },
+    });
+  }
+
+  configureInference(remote) {
+    this.sendCommand({ type: CaptureCommand.CONFIGURE_INFERENCE, remote });
   }
 
   pause() {
@@ -84,6 +96,8 @@ class CaptureHost extends EventEmitter {
   destroy() {
     ipcMain.off(IpcChannel.CAPTURE_STATUS, this.onStatus);
     ipcMain.off(IpcChannel.PROBE_RESULT, this.onProbeResult);
+    ipcMain.off(IpcChannel.CAPTURE_RESULT, this.onInferenceResult);
+    ipcMain.off(IpcChannel.CAPTURE_INFERENCE_STATE, this.onInferenceState);
     this.window?.destroy();
     this.window = null;
   }

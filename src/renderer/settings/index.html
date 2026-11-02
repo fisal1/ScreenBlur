@@ -33,6 +33,36 @@
         <p id="status" class="hint">Waiting for the first result...</p>
       </section>
 
+      <section class="card remote-card">
+        <h2>Remote inference (optional)</h2>
+        <label class="remote-toggle">
+          <input id="remote-enabled" type="checkbox" />
+          Send captured screen frames to a remote service
+        </label>
+        <p class="hint privacy-warning">
+          Enabling this sends JPEG screen frames off this device. Use only a service you trust.
+          Remote service failure never counts as a safe result.
+        </p>
+        <label class="field-label" for="remote-endpoint">WebSocket endpoint</label>
+        <input id="remote-endpoint" class="text-input" type="url" autocomplete="off" spellcheck="false" />
+        <label class="field-label" for="remote-profile">Device profile</label>
+        <select id="remote-profile" class="text-input">
+          <option value="low">Low-end — up to 1 frame/s</option>
+          <option value="mid">Mid-range — up to 2 frames/s</option>
+          <option value="high">High-end — up to 3 frames/s</option>
+        </select>
+        <label class="field-label" for="remote-token">Service token (not saved)</label>
+        <input id="remote-token" class="text-input" type="password" autocomplete="new-password" />
+        <label class="remote-toggle clear-token">
+          <input id="clear-token" type="checkbox" />
+          Clear the in-memory service token
+        </label>
+        <div class="remote-actions">
+          <button id="save-remote" type="button">Apply remote settings</button>
+          <span id="remote-status" role="status" aria-live="polite"></span>
+        </div>
+      </section>
+
       <p class="footnote">Changes apply immediately and are saved.</p>
     </main>
     <script src="settings.js"></script>

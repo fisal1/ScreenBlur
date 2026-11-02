@@ -13,4 +13,6 @@ contextBridge.exposeInMainWorld('screenblur', {
   onCommand: (callback) => ipcRenderer.on(IpcChannel.CAPTURE_COMMAND, (_event, command) => callback(command)),
   reportStatus: (level, message) => ipcRenderer.send(IpcChannel.CAPTURE_STATUS, { level, message }),
   reportProbe: (id, fraction) => ipcRenderer.send(IpcChannel.PROBE_RESULT, { id, fraction }),
+  reportInferenceResult: (result) => ipcRenderer.send(IpcChannel.CAPTURE_RESULT, result),
+  reportInferenceState: (state) => ipcRenderer.send(IpcChannel.CAPTURE_INFERENCE_STATE, state),
 });

@@ -46,6 +46,8 @@ const config = Object.freeze({
     staticMaxChangedPixels: 2, // a frame with at most this many changed pixels counts as static
     busyTimeoutMs: 3000, // give up waiting for a "done" reply after this
     maxInFlight: 2, // capture the next frame while the previous one is being analyzed
+    maxFrameAgeMs: 1500,
+    jpegQuality: 0.82,
   }),
 
   inference: Object.freeze({
@@ -54,6 +56,11 @@ const config = Object.freeze({
     // Measured on a Ryzen 7 4800H laptop at 960x544: CPU ~140 ms, Radeon iGPU ~45 ms, RTX 3050 ~19 ms.
     backends: PLATFORM.backends,
     benchmarkRuns: 5,
+  }),
+
+  remoteInference: Object.freeze({
+    defaultEndpoint: 'ws://127.0.0.1:8000/v1/inference/stream',
+    defaultProfile: 'mid',
   }),
 
   // Detected areas, sent from the inference worker.

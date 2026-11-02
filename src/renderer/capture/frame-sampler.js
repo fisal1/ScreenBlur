@@ -73,6 +73,14 @@ class FrameSampler {
    * Returns the pixels plus the size of the screen content inside the padded frame.
    */
   letterboxedFrame() {
+    const dimensions = this.drawLetterboxedFrame();
+    return {
+      image: this.frameContext.getImageData(0, 0, this.inputSize.width, this.inputSize.height),
+      ...dimensions,
+    };
+  }
+
+  drawLetterboxedFrame() {
     const { width, height } = this.inputSize;
     const { videoWidth, videoHeight } = this.video;
     const scale = Math.min(width / videoWidth, height / videoHeight);
@@ -82,7 +90,25 @@ class FrameSampler {
     context.fillStyle = '#000';
     context.fillRect(0, 0, width, height);
     context.drawImage(this.video, 0, 0, contentWidth, contentHeight);
-    return { image: context.getImageData(0, 0, width, height), contentWidth, contentHeight };
+    return { contentWidth, contentHeight };
+  }
+
+  async jpegFrame(quality) {
+    const { contentWidth, contentHeight } = this.drawLetterboxedFrame();
+    const blob = await new Promise((resolve, reject) => {
+      this.frameContext.canvas.toBlob(
+        (encoded) => (encoded ? resolve(encoded) : reject(new Error('Could not encode captured frame as JPEG'))),
+        'image/jpeg',
+        quality,
+      );
+    });
+    return {
+      bytes: new Uint8Array(await blob.arrayBuffer()),
+      width: this.inputSize.width,
+      height: this.inputSize.height,
+      contentWidth,
+      contentHeight,
+    };
   }
 
   /** Fraction of pure magenta pixels; used by the self-test to detect the test window. */

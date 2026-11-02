@@ -17,6 +17,7 @@ const { SettingsStore } = require('./settings-store');
 const { SettingsWindow } = require('./settings-window');
 const { registerHotkeys, unregisterHotkeys } = require('./hotkeys');
 const { hasScreenRecordingPermission, explainScreenRecordingPermission } = require('./permissions');
+const { validateRemoteEndpoint } = require('./remote-settings');
 
 const MINUTE_MS = 60_000;
 
@@ -34,7 +35,21 @@ class ScreenBlurApp extends EventEmitter {
 
     this.settings = new SettingsStore(path.join(app.getPath('userData'), config.settingsFileName), {
       thresholdPercent: SENSITIVITY_PRESETS.balanced,
+      remoteInferenceEnabled: false,
+      remoteEndpoint: config.remoteInference.defaultEndpoint,
+      remoteProfile: config.remoteInference.defaultProfile,
     });
+    let remoteEndpoint;
+    try {
+      remoteEndpoint = validateRemoteEndpoint(this.settings.get('remoteEndpoint'));
+    } catch (error) {
+      console.warn(`[settings] invalid remote endpoint; using default: ${error.message}`);
+      remoteEndpoint = config.remoteInference.defaultEndpoint;
+      this.settings.set('remoteEndpoint', remoteEndpoint);
+    }
+    const remoteProfile = ['low', 'mid', 'high'].includes(this.settings.get('remoteProfile'))
+      ? this.settings.get('remoteProfile')
+      : config.remoteInference.defaultProfile;
     const thresholdPercent = clampThresholdPercent(this.settings.get('thresholdPercent'));
 
     this.regions = new RegionTracker({ ...config.regionTracking, ...thresholdsFromPercent(thresholdPercent) });
@@ -46,6 +61,8 @@ class ScreenBlurApp extends EventEmitter {
     this.display = null;
     this.timers = { snooze: null, trayRefresh: null };
     this.lastMaskKey = null;
+    this.inputSize = null;
+    this.remoteToken = '';
 
     this.state = {
       enabled: true,
@@ -57,18 +74,38 @@ class ScreenBlurApp extends EventEmitter {
       lastResult: null,
       backend: null,
       error: null,
+      remoteInference: this.settings.get('remoteInferenceEnabled') === true,
+      remoteEndpoint,
+      remoteProfile,
+      remoteConnection: 'disconnected',
+      remoteError: null,
     };
   }
 
   async start() {
     this.display = screen.getPrimaryDisplay();
     const inputSize = modelInputSize(this.display.size, this.config.modelInput);
+    this.inputSize = inputSize;
     await this.overlay.create(this.display);
     await this.capture.create();
     this.wireCapture();
     this.wireInference();
-    this.inference.start(inputSize);
-    await this.capture.open(this.display, inputSize);
+    try {
+      const remote = this.state.remoteInference
+        ? this.remoteConnectionConfig()
+        : null;
+      await this.capture.open(this.display, inputSize, remote);
+    } catch (err) {
+      if (this.config.platform.needsScreenRecordingPermission && !hasScreenRecordingPermission()) {
+        console.error(`[capture] ${err?.message ?? err}`);
+        this.setError('Screen Recording permission needed');
+        await explainScreenRecordingPermission();
+        app.quit();
+        return;
+      }
+      throw err;
+    }
+    if (!this.state.remoteInference) this.inference.start(inputSize);
 
     if (this.showTray) {
       this.createTray();
@@ -156,10 +193,31 @@ class ScreenBlurApp extends EventEmitter {
       console[level === 'error' ? 'error' : 'log'](`[capture] ${message}`);
       if (level === 'error') this.setError(message);
     });
+    this.capture.on('result', (result) => this.handleResult(result));
+    this.capture.on('inference-state', ({ state, detail }) => {
+      if (!['connecting', 'connected', 'disconnected'].includes(state)) {
+        this.state.remoteError = detail ?? state;
+        this.updateSettingsWindow();
+        return;
+      }
+      this.state.remoteConnection = state;
+      this.state.remoteError = state === 'connected' ? null : detail ?? null;
+      if (state === 'connected' && this.state.remoteInference) {
+        this.state.ready = true;
+        this.state.backend = 'remote';
+        this.state.error = null;
+        this.refresh();
+      } else {
+        this.updateSettingsWindow();
+      }
+    });
   }
 
   wireInference() {
-    this.inference.on('port', (port) => this.capture.attachInferencePort(port));
+    this.inference.on('port', (port) => {
+      if (!this.state.remoteInference) this.capture.attachInferencePort(port);
+      else port.close();
+    });
     this.inference.on('ready', ({ modelId, inputSize, backend }) => {
       const tried = backend.attempts.map((a) => `${a.label}: ${a.error ? 'unavailable' : `${a.medianMs.toFixed(0)} ms`}`).join(', ');
       console.log(`[inference] ready (${modelId}, input ${inputSize.width}x${inputSize.height}, using ${backend.label}; tried ${tried})`);
@@ -226,7 +284,63 @@ class ScreenBlurApp extends EventEmitter {
     this.settingsWindow = new SettingsWindow(this.config, {
       getState: () => this.settingsViewState(),
       setThresholdPercent: (percent) => this.setThresholdPercent(percent),
+      setRemoteInference: (settings) => this.setRemoteInferenceSettings(settings),
     });
+  }
+
+  remoteConnectionConfig() {
+    return {
+      enabled: true,
+      endpoint: validateRemoteEndpoint(this.state.remoteEndpoint),
+      token: this.remoteToken,
+      profile: this.state.remoteProfile,
+    };
+  }
+
+  setRemoteInferenceSettings(settings) {
+    try {
+      if (!settings || typeof settings !== 'object') throw new Error('Invalid remote inference settings');
+      const enabled = Boolean(settings.enabled);
+      const endpoint = validateRemoteEndpoint(settings.endpoint);
+      const profile = ['low', 'mid', 'high'].includes(settings.profile) ? settings.profile : 'mid';
+      if (typeof settings.token === 'string') {
+        if (settings.token.length > 512) throw new Error('The service token is too long');
+        this.remoteToken = settings.token.trim();
+      }
+      if (settings.clearToken) this.remoteToken = '';
+      if (enabled && !this.remoteToken) throw new Error('Enter the service token before enabling remote inference');
+
+      const modeChanged = enabled !== this.state.remoteInference;
+      this.state.remoteError = null;
+      this.state.remoteInference = enabled;
+      this.state.remoteEndpoint = endpoint;
+      this.state.remoteProfile = profile;
+      this.settings.set('remoteInferenceEnabled', enabled);
+      this.settings.set('remoteEndpoint', endpoint);
+      this.settings.set('remoteProfile', profile);
+
+      if (modeChanged) {
+        if (enabled) {
+          this.inference.stop();
+          this.state.remoteConnection = 'connecting';
+          this.capture.configureInference(this.remoteConnectionConfig());
+        } else {
+          this.capture.configureInference(null);
+          this.state.remoteConnection = 'disconnected';
+          this.inference.start(this.inputSize);
+        }
+        this.refresh();
+      } else if (enabled) {
+        this.state.remoteConnection = 'connecting';
+        this.capture.configureInference(this.remoteConnectionConfig());
+      }
+      this.updateSettingsWindow();
+      return { ok: true };
+    } catch (error) {
+      this.state.remoteError = error.message;
+      this.updateSettingsWindow();
+      return { ok: false, error: error.message };
+    }
   }
 
   registerHotkeys() {
@@ -314,6 +428,11 @@ class ScreenBlurApp extends EventEmitter {
       scorePercent: lastResult ? lastResult.score * 100 : null,
       overlayVisible: this.overlay.visible,
       running: this.running,
+      remoteInference: this.state.remoteInference,
+      remoteEndpoint: this.state.remoteEndpoint,
+      remoteProfile: this.state.remoteProfile,
+      remoteConnection: this.state.remoteConnection,
+      remoteError: this.state.remoteError,
     };
   }
 }

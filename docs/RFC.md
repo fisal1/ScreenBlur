@@ -1,23 +1,25 @@
-# RFC: ScreenBlur - Electron App with In-Process ONNX Inference
+# RFC: ScreenBlur - Local-First Inference with Optional Remote Service
 
 *Author*: Moneshwar  
-*Status*: Draft (rev 2)  
+*Status*: Draft (rev 3; remote-inference desktop prototype)
 *Target Platform*: Windows (v1), macOS (v1.1), Linux (later)  
-*Last Updated*: 2026-10-27
+*Last Updated*: 2026-11-02
 
 ## 1. Summary
 
 ScreenBlur is a desktop app that detects explicit/adult scenes on screen and overlays a SFW GIF/blur over them.
 
-Everything runs inside one Electron app:
+The default mode runs inside one Electron app:
 - **Main process** - tray, global hotkeys, settings, permissions, overlay window management.
 - **Capture renderer** (hidden window) - screen capture via `desktopCapturer` + `getUserMedia`, downscaling to model input size.
 - **Inference utility process** (`utilityProcess`) - runs quantized ONNX models (e.g. OpenNSFW, later NudeNet) with `onnxruntime-node`, returns scores.
 - **Overlay window** - transparent, click-through, always-on-top, **excluded from screen capture**.
 
-All processing is local. No frames leave the device, and there is no network listener.
+Local inference keeps all frames on-device. An opt-in remote prototype is described in
+[REMOTE_INFERENCE.md](./REMOTE_INFERENCE.md); when enabled, JPEG frames leave the device for a
+user-configured service. Remote processing is off by default.
 
-> **Change from rev 1:** The Python FastAPI sidecar over WebSocket has been replaced by in-process ONNX inference. The models are ONNX either way, and dropping Python removes PyInstaller, binary download/verification, sidecar lifecycle management, a custom wire protocol, and a localhost attack surface. The sidecar design is kept in [Appendix A](#appendix-a-python-sidecar-alternative) as a fallback.
+> **Change from rev 1:** Local in-process ONNX inference remains the default. The optional Python FastAPI sidecar prototype is documented in [REMOTE_INFERENCE.md](./REMOTE_INFERENCE.md); the original sidecar design is also retained in [Appendix A](#appendix-a-python-sidecar-alternative).
 
 ## 2. Goals & Non-Goals
 
@@ -28,11 +30,11 @@ All processing is local. No frames leave the device, and there is no network lis
 - [ ] Latest-frame-only pipeline: never process stale frames
 - [ ] Asymmetric hysteresis: show fast, hide slow, no flicker
 - [ ] Click-through transparent overlay over fullscreen apps
-- [ ] Fully offline; models bundled with the app
+- [ ] Local mode is fully offline; remote inference requires explicit user opt-in
 - [ ] User controls for false positives (snooze, "this was wrong")
 
 ### Non-Goals
-- [ ] Cloud inference/telemetry
+- [ ] Managed cloud inference/telemetry
 - [ ] Audio detection
 - [ ] Blocking screenshots/recordings
 - [ ] Detecting DRM-protected video (it captures as black; see 10)
@@ -241,8 +243,8 @@ Two thresholds (high/low) prevent oscillation around a single cutoff. Missing a 
 
 ## 12. Notes
 
-- **Security**: No network listeners. All IPC is in-process via MessagePort.
-- **Privacy**: Frames exist only in memory at model resolution and are discarded after inference. No frame logging.
+- **Security**: Local mode has no network listener; IPC stays in-process via MessagePort. The remote prototype uses the authenticated WebSocket service described in [REMOTE_INFERENCE.md](./REMOTE_INFERENCE.md).
+- **Privacy**: Local frames stay in memory at model resolution and are discarded after inference. Remote mode sends JPEG frames to the user-configured service; the prototype does not persist frames or log their contents.
 - **Ethics**: Personal use only. Be transparent about screen capture permissions. Follow local laws and platform ToS.
 - **Keep it minimal**: Classifier-only model and full-screen overlay first. ROI/NudeNet later.
 

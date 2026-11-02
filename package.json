@@ -2,7 +2,7 @@
   "name": "screenblur",
   "productName": "ScreenBlur",
   "version": "0.2.0",
-  "description": "Detects explicit content on screen and covers just those areas. All processing is local.",
+  "description": "Detects explicit content on screen; local inference by default with optional remote processing.",
   "main": "src/main/index.js",
   "private": true,
   "author": {

@@ -1,7 +1,8 @@
 # ScreenBlur (POC)
 
 Detects explicit content on screen and blurs only the areas where it appears; the rest of the
-screen stays untouched. Everything runs locally; no frames leave the device. See
+screen stays untouched. Local inference is the default. Optional remote inference sends captured
+frames to a service you configure; it is off by default. See
 [docs/RFC.md](docs/RFC.md) (rev 2) for the original design.
 
 ## Install
@@ -68,9 +69,9 @@ them as a GitHub Release when a version tag (`v*`) is pushed. `build/icon.png` i
 
 ## How it works
 
-1. A hidden window captures the primary display at the model input size (960x544 on 16:9) and
-   sends each new frame as soon as the capture stream delivers it (up to 30 fps). The model runs
-   on the fastest device found at startup (GPU via DirectML, CoreML or CUDA, otherwise CPU).
+1. A hidden window captures the primary display at the model input size (960x544 on 16:9).
+   Local mode sends frames to an ONNX worker on the fastest device found at startup; optional
+   remote mode JPEG-encodes frames and sends them to a separately configured inference service.
 2. The NudeNet detector finds exposed body parts; overlapping boxes are merged and each box is
    padded by 20% so small movements don't expose its edges.
 3. Each area is covered with the animated GIF in `assets/patch.gif` (cropped to fit). If that
@@ -87,6 +88,18 @@ them as a GitHub Release when a version tag (`v*`) is pushed. `build/icon.png` i
 
 Measured on a Ryzen 7 4800H + RTX 3050 laptop: ~29 updates/s, ~18 ms per frame on the GPU
 (CPU only: ~6 updates/s).
+
+### Optional remote inference
+
+Remote mode is disabled by default. The Settings window has a separate remote-inference section
+with an explicit opt-in, endpoint, service token, and 1/2/3 FPS profile. Captured frames contain
+the screen and may include private information. The bearer token is held in memory only, sent in
+the WebSocket authentication message (never in the URL), and must be entered again after restart.
+Non-loopback endpoints require `wss://`; the included service binds to localhost by default.
+Remote failures do not count as safe results or trigger an automatic local-mode switch.
+
+See [docs/REMOTE_INFERENCE.md](docs/REMOTE_INFERENCE.md) for running the service, selecting its
+GPU runtime, protocol details, LAN/TLS setup, and benchmark instructions.
 
 ## Controls
 
@@ -145,6 +158,7 @@ scripts/make-icon.js      draws build/icon.png
 build/icon.png            app icon (installers derive .ico/.icns from it)
 .github/workflows/        CI: test + build installers on Windows, macOS, Linux; release on tags
 scripts/score-image.js    diagnostic: score an image the way the app would
+service/                  optional Python FastAPI WebSocket inference service and benchmark client
 test/                     unit tests (node:test)
 models/                   NudeNet 320n ONNX model (downloaded)
 tools/                    say.ps1 (speech updates); portable Node.js is downloaded here
