@@ -98,8 +98,48 @@ the WebSocket authentication message (never in the URL), and must be entered aga
 Non-loopback endpoints require `wss://`; the included service binds to localhost by default.
 Remote failures do not count as safe results or trigger an automatic local-mode switch.
 
-See [docs/REMOTE_INFERENCE.md](docs/REMOTE_INFERENCE.md) for running the service, selecting its
-GPU runtime, protocol details, LAN/TLS setup, and benchmark instructions.
+#### Try remote inference locally
+
+This runs the inference service and ScreenBlur on the same computer. Use Python 3.11–3.14 and
+keep the service bound to localhost. The first run downloads Python dependencies and may take a
+few minutes.
+
+1. In a terminal at the repository root, create a Python environment and install the service
+   dependencies:
+
+   **macOS / Linux**
+
+   ```sh
+   python3 -m venv service/.venv
+   service/.venv/bin/python -m pip install -r service/requirements.txt
+   cd service
+   .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+   ```
+
+   **Windows PowerShell**
+
+   ```powershell
+   py -3 -m venv service\.venv
+   service\.venv\Scripts\python.exe -m pip install -r service\requirements.txt
+   cd service
+   .venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+   ```
+
+2. Leave the service running. Its startup log prints a generated test token. In another terminal,
+   start ScreenBlur from the repository root (`./start.sh` on macOS/Linux or `.\start.ps1` in
+   PowerShell). Allow screen-capture permission if your OS asks.
+3. Open **Settings** → **Remote inference (optional)**. Set the endpoint to
+   `ws://127.0.0.1:8000/v1/inference/stream`, paste the service token, choose a profile, enable
+   **Send captured screen frames to a remote service**, and click **Apply remote settings**.
+   The status should change to connected.
+4. To confirm the service is ready, open `http://127.0.0.1:8000/health` in a browser; it should
+   report `"status":"ready"`. Check `http://127.0.0.1:8000/model/info` to see which ONNX execution
+   provider is in use. Stop the service with Ctrl+C when finished.
+
+Use only a screen and service you trust: enabling remote mode sends captured screen images to the
+service, even when both run on the same computer. The token is not saved and must be entered again
+after restarting ScreenBlur. For troubleshooting, protocol details, benchmarks, or LAN/TLS setup,
+see [docs/REMOTE_INFERENCE.md](docs/REMOTE_INFERENCE.md).
 
 ## Controls
 
