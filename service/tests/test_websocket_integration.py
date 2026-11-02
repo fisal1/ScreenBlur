@@ -75,7 +75,10 @@ class WebSocketIntegrationTests(unittest.TestCase):
         })
 
     def test_authentication_and_result_round_trip(self):
-        with self.client.websocket_connect("/v1/inference/stream") as socket:
+        with self.client.websocket_connect(
+            "/v1/inference/stream",
+            headers={"origin": "file://"},
+        ) as socket:
             self.authenticate(socket)
             ready = socket.receive_json()
             self.assertEqual(ready["type"], "ready")

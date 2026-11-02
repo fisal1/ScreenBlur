@@ -24,7 +24,8 @@ run `python -m uvicorn app.main:app --host 127.0.0.1 --port 8000` from `service/
 The service generates a one-time authentication token and prints it at startup. Copy it to
 ScreenBlur Settings → **Remote inference**. The token is not saved by the client. To supply your
 own service token instead, set `SCREENBLUR_BEARER_TOKEN` in the service process environment.
-Do not publish service logs or tokens.
+The WebSocket endpoint accepts Electron's local `file://` origin as well as `null` origins; all
+connections still require the service token. Do not publish service logs or tokens.
 
 The default `onnxruntime` package uses CPU inference. On a supported CUDA machine, create a clean
 virtual environment and install `service/requirements-gpu.txt` instead of `requirements.txt`;

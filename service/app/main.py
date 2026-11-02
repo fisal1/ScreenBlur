@@ -118,7 +118,8 @@ async def send_error(websocket, code, message, correlation_id=None, seq=None):
 @app.websocket("/v1/inference/stream")
 async def inference_stream(websocket: WebSocket):
     origin = websocket.headers.get("origin")
-    if origin not in (None, "null"):
+    if origin not in (None, "null", "file://"):
+        logger.warning("Rejected WebSocket connection from untrusted Origin %r", origin)
         await websocket.close(code=1008, reason="Browser origins are not accepted")
         return
 
