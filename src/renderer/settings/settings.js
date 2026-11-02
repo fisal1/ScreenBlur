@@ -16,7 +16,53 @@ const elements = {
   models: document.getElementById('models'),
   modes: document.getElementById('modes'),
   engineStatus: document.getElementById('engine-status'),
+  patchStyles: document.getElementById('patch-styles'),
+  patchPreview: document.getElementById('patch-preview'),
+  patchName: document.getElementById('patch-name'),
+  choosePatch: document.getElementById('choose-patch'),
+  previewPatch: document.getElementById('preview-patch'),
 };
+
+let renderedPatchKey = null;
+
+function describePatch({ style, customName }) {
+  if (style === 'blur') return 'Blur of the content underneath';
+  if (style === 'custom' && customName) return customName;
+  return 'Default GIF';
+}
+
+/** Cover style buttons and a preview of the image (or blur) that covers detected areas. */
+function renderPatch(patch) {
+  const key = JSON.stringify(patch);
+  if (key === renderedPatchKey) return; // avoid reloading the preview image on every update
+  renderedPatchKey = key;
+
+  elements.patchStyles.replaceChildren(...patch.styles.map((style) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = style.name;
+    button.className = style.id === patch.style ? 'active' : '';
+    button.setAttribute('role', 'radio');
+    button.setAttribute('aria-checked', String(style.id === patch.style));
+    button.addEventListener('click', () => api.setPatchStyle(style.id));
+    return button;
+  }));
+
+  elements.patchPreview.classList.toggle('blur', !patch.imageUrl);
+  if (patch.imageUrl) {
+    const image = document.createElement('img');
+    image.src = patch.imageUrl;
+    image.alt = '';
+    elements.patchPreview.replaceChildren(image);
+  } else {
+    elements.patchPreview.replaceChildren();
+  }
+  elements.patchName.textContent = describePatch(patch);
+  elements.patchName.title = describePatch(patch);
+}
+
+elements.choosePatch.addEventListener('click', () => api.choosePatchImage());
+elements.previewPatch.addEventListener('click', () => api.previewPatch());
 
 /** Builds the model and performance choices; clicking one asks main to apply it (restarts). */
 function renderEngineChoices({ models, modelId, performanceModes, performanceMode }) {
@@ -112,6 +158,7 @@ function render(state) {
   if (!dragging) renderThreshold(state.thresholdPercent);
   renderLive(state);
   renderEngineStatus(state.engine);
+  renderPatch(state.patch);
 }
 
 elements.slider.addEventListener('input', () => applyThreshold(Number(elements.slider.value)));
@@ -128,5 +175,6 @@ api.getState().then((state) => {
   renderLive(state);
   renderEngineChoices(state.engine);
   renderEngineStatus(state.engine);
+  renderPatch(state.patch);
   api.onUpdate(render);
 });

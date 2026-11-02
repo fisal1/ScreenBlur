@@ -3,15 +3,15 @@ const { IpcChannel } = require('../shared/messages');
 const { isAlive } = require('./window-utils');
 
 const WINDOW_WIDTH = 460;
-const CONTENT_HEIGHT = 880; // the page scrolls when the screen is smaller
+const CONTENT_HEIGHT = 1080; // the page scrolls when the screen is smaller
 
 /**
- * Settings window: sensitivity slider with a live score meter, and the detection engine
- * (model and performance mode). `getState()` supplies what the page shows; the other
- * callbacks apply changes.
+ * Settings window: sensitivity slider with a live score meter, the cover style (image or blur)
+ * and the detection engine (model and performance mode). `getState()` supplies what the page
+ * shows; the other callbacks apply changes.
  */
 class SettingsWindow {
-  constructor(config, { getState, setThresholdPercent, setModel, setPerformanceMode }) {
+  constructor(config, { getState, setThresholdPercent, setModel, setPerformanceMode, setPatchStyle, choosePatchImage, previewPatch }) {
     this.config = config;
     this.window = null;
     this.onGet = (event) => (this.isFromWindow(event) ? getState() : null);
@@ -20,6 +20,9 @@ class SettingsWindow {
       [IpcChannel.SETTINGS_SET_THRESHOLD]: setThresholdPercent,
       [IpcChannel.SETTINGS_SET_MODEL]: setModel,
       [IpcChannel.SETTINGS_SET_PERFORMANCE_MODE]: setPerformanceMode,
+      [IpcChannel.SETTINGS_SET_PATCH_STYLE]: setPatchStyle,
+      [IpcChannel.SETTINGS_CHOOSE_PATCH_IMAGE]: choosePatchImage,
+      [IpcChannel.SETTINGS_PREVIEW_PATCH]: previewPatch,
     };
     this.guarded = Object.fromEntries(
       Object.entries(this.listeners).map(([channel, handler]) => [channel, (event, value) => this.isFromWindow(event) && handler(value)]),
@@ -55,6 +58,11 @@ class SettingsWindow {
       this.window = null;
     });
     this.window.loadFile(this.config.paths.settingsPage);
+  }
+
+  /** The open window (parent for dialogs), or null. */
+  get browserWindow() {
+    return isAlive(this.window) ? this.window : null;
   }
 
   /** Sends fresh state to the page if the window is open. */

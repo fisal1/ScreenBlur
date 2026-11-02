@@ -3,12 +3,13 @@
 const api = window.screenblurOverlay;
 const container = document.getElementById('regions');
 const elements = new Map(); // region id -> { root, canvas, region }
-const patchImageUrl = new URLSearchParams(window.location.search).get('patch') || '';
 
+let patchImageUrl = ''; // set by main; '' draws a blur
+let lastFrame = null;
 let motion = { renderDelayMs: 16, maxLeadMs: 200 };
 let animationFrame = null;
 
-/** A patch shows the GIF when one is installed, otherwise a blur of the content underneath. */
+/** A patch shows the chosen image, or a blur of the content underneath when there is none. */
 function createRegionElement() {
   const root = document.createElement('div');
   root.className = 'region';
@@ -55,7 +56,9 @@ function animate() {
   if (moving) animationFrame = requestAnimationFrame(animate);
 }
 
-function render({ regions, motion: motionOptions }) {
+function render(frame) {
+  lastFrame = frame;
+  const { regions, motion: motionOptions } = frame;
   motion = motionOptions;
   const seen = new Set();
   for (const region of regions) {
@@ -78,4 +81,13 @@ function render({ regions, motion: motionOptions }) {
   animate();
 }
 
+/** Rebuilds the patches on screen so they switch to the new image (or blur) at once. */
+function setPatchImage(imageUrl) {
+  patchImageUrl = imageUrl;
+  for (const element of elements.values()) element.root.remove();
+  elements.clear();
+  if (lastFrame) render(lastFrame);
+}
+
 api.onRender(render);
+api.onSetPatch(setPatchImage);

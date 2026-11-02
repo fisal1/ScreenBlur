@@ -109,10 +109,10 @@ them as a GitHub Release when a version tag (`v*`) is pushed. `build/icon.png` i
    on the fastest device found at startup (GPU via DirectML, CoreML or CUDA, otherwise CPU).
 2. The detection model (NudeNet or EraX, see Settings) finds explicit areas; overlapping boxes
    are merged and each box is padded by 20% so small movements don't expose its edges.
-3. Each area is covered with the animated GIF in `assets/patch.gif` (cropped to fit). If that
-   file is missing, the area gets a blur instead: a tiny averaged-color grid of what's
-   underneath, drawn scaled up and blurred, so it can't be seen through. Replace
-   `assets/patch.gif` with any GIF to change what's shown.
+3. Each area is covered according to Settings > Cover style: the default GIF
+   (`assets/patch.gif`), your own GIF or image, or a blur (a tiny averaged-color grid of what's
+   underneath, drawn scaled up and blurred, so it can't be seen through). Images are cropped to
+   fit and animated GIFs keep animating.
 4. A transparent, click-through window that is excluded from screen capture draws the patches.
 5. Areas are tracked individually: one appears when its score reaches the threshold, follows the
    content while its score stays above half the threshold, and disappears 1.5 s after it was last
@@ -133,8 +133,11 @@ See "Models and performance mode" for measured speed, memory and CPU use.
 
 Left-click the tray icon (or choose **Settings...**) to open the settings window: a slider sets
 the score (5-95%) at which an area is blurred, with a live meter of the highest score on screen,
-and the Engine section picks the model and performance mode. Settings are saved in
-`%APPDATA%\ScreenBlur\settings.json`.
+Cover style chooses what covers detected areas (default GIF, your own GIF / PNG / JPG / WebP up
+to 25 MB, or blur; applies immediately, with a "Preview on screen" button), and the Engine
+section picks the model and performance mode. Settings are saved in
+`%APPDATA%\ScreenBlur\settings.json`; a copy of your chosen image is kept in
+`%APPDATA%\ScreenBlur\patches\`, so moving or deleting the original doesn't matter.
 
 The tray menu also has sensitivity presets (Strict 20% / Balanced 30% / Relaxed 45%), snooze
 (5 / 15 / 60 min) and quit. Hovering over the tray icon shows how many areas are blurred.
@@ -157,6 +160,8 @@ src/
     settings-window.js    settings window (sensitivity, live score, engine)
     engine-profile.js     model + performance mode -> devices, input size, frame rate
     settings-store.js     saved settings (JSON in userData)
+    patch-store.js        cover style: default GIF, the user's image (validated copy) or blur
+    window-utils.js       guards against using windows Electron already destroyed
     hotkeys.js            global shortcuts
     self-test.js          Phase 0 checks
     platform.js           per-OS differences (GPU backends, overlay capture, permissions)

@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' file:" />
     <link rel="stylesheet" href="settings.css" />
     <title>ScreenBlur Settings</title>
   </head>
@@ -31,6 +31,20 @@
           <div id="meter-marker" class="meter-marker"></div>
         </div>
         <p id="status" class="hint">Waiting for the first result...</p>
+      </section>
+
+      <h2>Cover style</h2>
+      <section class="card">
+        <div id="patch-styles" class="segmented" role="radiogroup" aria-label="Cover style"></div>
+        <div class="patch-preview-row">
+          <div id="patch-preview" class="patch-preview" aria-label="Current cover"></div>
+          <div class="patch-actions">
+            <p id="patch-name" class="hint patch-name"></p>
+            <button id="choose-patch" type="button" class="action">Choose GIF or image...</button>
+            <button id="preview-patch" type="button" class="action secondary">Preview on screen</button>
+          </div>
+        </div>
+        <p class="hint">GIF, PNG, JPG or WebP up to 25 MB. Animated GIFs keep animating. Changes apply immediately.</p>
       </section>
 
       <h2>Engine</h2>

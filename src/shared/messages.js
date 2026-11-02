@@ -26,10 +26,14 @@ const IpcChannel = Object.freeze({
   CAPTURE_STATUS: 'capture-status',
   PROBE_RESULT: 'probe-result',
   OVERLAY_RENDER: 'overlay-render',
+  OVERLAY_SET_PATCH: 'overlay-set-patch', // image URL covering areas, '' for a blur
   SETTINGS_GET: 'settings-get',
   SETTINGS_SET_THRESHOLD: 'settings-set-threshold',
   SETTINGS_SET_MODEL: 'settings-set-model',
   SETTINGS_SET_PERFORMANCE_MODE: 'settings-set-performance-mode',
+  SETTINGS_SET_PATCH_STYLE: 'settings-set-patch-style',
+  SETTINGS_CHOOSE_PATCH_IMAGE: 'settings-choose-patch-image',
+  SETTINGS_PREVIEW_PATCH: 'settings-preview-patch',
   SETTINGS_UPDATE: 'settings-update',
 });
 

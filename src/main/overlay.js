@@ -1,4 +1,3 @@
-const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const { BrowserWindow } = require('electron');
 const { IpcChannel } = require('../shared/messages');
@@ -59,31 +58,33 @@ function createTestRegion() {
   };
 }
 
-/** file:// URL of the patch GIF, or '' to draw blurred patches instead. */
-function patchImageUrl(gifPath) {
-  return fs.existsSync(gifPath) ? pathToFileURL(gifPath).href : '';
-}
-
 /**
- * Transparent, capture-excluded window over one display that covers detected areas with
- * the patch GIF (or a blur when no GIF is installed). Region boxes are normalized (0..1)
- * to the display; the page keeps moving each patch along its velocity between updates.
+ * Transparent, capture-excluded window over one display that covers detected areas with an
+ * image (or a blur; see patch-store.js). Region boxes are normalized (0..1) to the display;
+ * the page keeps moving each patch along its velocity between updates.
  */
 class OverlayManager {
   constructor(config) {
     this.config = config;
     this.window = null;
+    this.patchImageUrl = '';
   }
 
-  async create(display) {
+  /** @param patchImagePath image covering areas, or null for a blur */
+  async create(display, patchImagePath) {
     this.window = createCoverWindow({
       bounds: display.bounds,
       contentProtection: this.config.platform.useContentProtection,
       preload: this.config.paths.overlayPreload,
     });
-    await this.window.loadFile(this.config.paths.overlayPage, {
-      query: { patch: patchImageUrl(this.config.paths.patchGif) },
-    });
+    await this.window.loadFile(this.config.paths.overlayPage);
+    this.setPatchImage(patchImagePath);
+  }
+
+  /** Switches what covers areas, including patches already on screen. */
+  setPatchImage(imagePath) {
+    this.patchImageUrl = imagePath ? pathToFileURL(imagePath).href : '';
+    if (isAlive(this.window)) this.window.webContents.send(IpcChannel.OVERLAY_SET_PATCH, this.patchImageUrl);
   }
 
   get visible() {

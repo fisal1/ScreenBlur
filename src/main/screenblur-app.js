@@ -1,6 +1,7 @@
 const { EventEmitter } = require('node:events');
 const path = require('node:path');
-const { app, screen, powerMonitor } = require('electron');
+const { pathToFileURL } = require('node:url');
+const { app, dialog, screen, powerMonitor } = require('electron');
 const {
   SENSITIVITY_PRESETS,
   THRESHOLD_PERCENT_RANGE,
@@ -17,10 +18,12 @@ const { modelInputSize } = require('./model-input');
 const { TrayController } = require('./tray');
 const { SettingsStore } = require('./settings-store');
 const { SettingsWindow } = require('./settings-window');
+const { PatchStore, IMAGE_FILE_EXTENSIONS } = require('./patch-store');
 const { registerHotkeys, unregisterHotkeys } = require('./hotkeys');
 const { hasScreenRecordingPermission, explainScreenRecordingPermission } = require('./permissions');
 
 const MINUTE_MS = 60_000;
+const PATCH_PREVIEW_MS = 3000;
 
 /**
  * Orchestrates capture -> inference -> region tracking -> overlay, plus user controls.
@@ -45,6 +48,12 @@ class ScreenBlurApp extends EventEmitter {
       performanceMode: this.settings.get('performanceMode'),
     });
 
+    this.patches = new PatchStore({
+      settings: this.settings,
+      customDir: path.join(app.getPath('userData'), 'patches'),
+      defaultImagePath: config.paths.patchGif,
+    });
+
     this.regions = new RegionTracker({ ...config.regionTracking, ...thresholdsFromPercent(thresholdPercent) });
     this.inference = new InferenceHost(config, this.engine, this.createBackendMemory(this.engine.model.id));
     this.capture = new CaptureHost(config);
@@ -52,7 +61,7 @@ class ScreenBlurApp extends EventEmitter {
     this.tray = null;
     this.settingsWindow = null;
     this.display = null;
-    this.timers = { snooze: null, trayRefresh: null };
+    this.timers = { snooze: null, trayRefresh: null, patchPreview: null };
     this.lastMaskKey = null;
     this.stopped = false;
 
@@ -72,7 +81,7 @@ class ScreenBlurApp extends EventEmitter {
   async start() {
     this.display = screen.getPrimaryDisplay();
     const inputSize = modelInputSize(this.display.size, this.engine.modelInput);
-    await this.overlay.create(this.display);
+    await this.overlay.create(this.display, this.patches.imagePath());
     await this.capture.create();
     this.wireCapture();
     this.wireInference();
@@ -104,6 +113,7 @@ class ScreenBlurApp extends EventEmitter {
     if (this.stopped) return;
     this.stopped = true;
     clearTimeout(this.timers.snooze);
+    clearTimeout(this.timers.patchPreview);
     clearInterval(this.timers.trayRefresh);
     unregisterHotkeys();
     this.settings.flush();
@@ -147,6 +157,54 @@ class ScreenBlurApp extends EventEmitter {
 
   setPerformanceMode(mode) {
     if (PERFORMANCE_MODES[mode]) this.setEngineSetting('performanceMode', mode);
+  }
+
+  // ---- cover style (applies immediately) ----
+
+  /** Choosing "My GIF / image" before any image was imported opens the file picker. */
+  setPatchStyle(style) {
+    if (this.patches.setStyle(style)) {
+      this.applyPatch();
+    } else {
+      this.choosePatchImage();
+    }
+  }
+
+  async choosePatchImage() {
+    const { canceled, filePaths } = await dialog.showOpenDialog(this.settingsWindow?.browserWindow ?? undefined, {
+      title: 'Choose a GIF or image to cover detected areas',
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: [...IMAGE_FILE_EXTENSIONS] }],
+    });
+    if (canceled || !filePaths.length || this.stopped) return;
+    try {
+      this.patches.importImage(filePaths[0]);
+    } catch (err) {
+      await dialog.showMessageBox(this.settingsWindow?.browserWindow ?? undefined, {
+        type: 'warning',
+        message: 'This image can\'t be used',
+        detail: err.message,
+      });
+      return;
+    }
+    this.applyPatch();
+    this.previewPatch();
+  }
+
+  /** Shows a sample patch in the middle of the screen for a few seconds. */
+  previewPatch() {
+    clearTimeout(this.timers.patchPreview);
+    this.state.testOverlay = true;
+    this.updateOverlay();
+    this.timers.patchPreview = setTimeout(() => {
+      this.state.testOverlay = false;
+      this.updateOverlay();
+    }, PATCH_PREVIEW_MS);
+  }
+
+  applyPatch() {
+    this.overlay.setPatchImage(this.patches.imagePath());
+    this.updateSettingsWindow();
   }
 
   get running() {
@@ -280,6 +338,9 @@ class ScreenBlurApp extends EventEmitter {
       setThresholdPercent: (percent) => this.setThresholdPercent(percent),
       setModel: (modelId) => this.setModel(modelId),
       setPerformanceMode: (mode) => this.setPerformanceMode(mode),
+      setPatchStyle: (style) => this.setPatchStyle(style),
+      choosePatchImage: () => this.choosePatchImage(),
+      previewPatch: () => this.previewPatch(),
     });
   }
 
@@ -380,7 +441,13 @@ class ScreenBlurApp extends EventEmitter {
         backend,
         msPerFrame: lastResult ? Math.round(lastResult.latencyMs) : null,
       },
+      patch: this.patchViewState(),
     };
+  }
+
+  patchViewState() {
+    const { imagePath, ...patch } = this.patches.describe();
+    return { ...patch, imageUrl: imagePath ? pathToFileURL(imagePath).href : null };
   }
 }
 

@@ -24,4 +24,4 @@ The converted EraX files are published unmodified (apart from the format convers
 
 | File | Notes |
 | :-- | :-- |
-| `assets/patch.gif` | Third-party animated GIF found on Pinterest; not created by this project. Replace it with your own GIF if you redistribute ScreenBlur and don't have the rights to it. |
+| `assets/patch.gif` | Third-party animated GIF found on Pinterest; not created by this project. It is only the default cover: users can pick their own image in Settings > Cover style. Replace the file if you redistribute ScreenBlur and don't have the rights to it. |

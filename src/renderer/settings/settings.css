@@ -219,3 +219,70 @@ h2 {
   color: #0b1520;
   font-weight: 600;
 }
+
+.patch-preview-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.patch-preview {
+  flex: none;
+  width: 120px;
+  height: 90px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0f1823;
+}
+
+.patch-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Stand-in for the blur style, which has no image of its own. */
+.patch-preview.blur {
+  background: linear-gradient(135deg, #5d6d7e, #8fa3b8, #4a5a6b);
+  filter: blur(1px);
+}
+
+.patch-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.patch-name {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action {
+  padding: 8px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #0b1520;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.action.secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: #2f4560;
+  font-weight: normal;
+}
+
+.action.secondary:hover {
+  border-color: var(--accent);
+}
