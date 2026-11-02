@@ -11,7 +11,7 @@ const CONTENT_HEIGHT = 1080; // the page scrolls when the screen is smaller
  * shows; the other callbacks apply changes.
  */
 class SettingsWindow {
-  constructor(config, { getState, setThresholdPercent, setModel, setPerformanceMode, setPatchStyle, choosePatchImage, previewPatch }) {
+  constructor(config, { getState, setThresholdPercent, setModel, setPerformanceMode, setPatchStyle, setCoverSize, choosePatchImage, previewPatch }) {
     this.config = config;
     this.window = null;
     this.onGet = (event) => (this.isFromWindow(event) ? getState() : null);
@@ -21,6 +21,7 @@ class SettingsWindow {
       [IpcChannel.SETTINGS_SET_MODEL]: setModel,
       [IpcChannel.SETTINGS_SET_PERFORMANCE_MODE]: setPerformanceMode,
       [IpcChannel.SETTINGS_SET_PATCH_STYLE]: setPatchStyle,
+      [IpcChannel.SETTINGS_SET_COVER_SIZE]: setCoverSize,
       [IpcChannel.SETTINGS_CHOOSE_PATCH_IMAGE]: choosePatchImage,
       [IpcChannel.SETTINGS_PREVIEW_PATCH]: previewPatch,
     };

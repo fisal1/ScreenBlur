@@ -28,6 +28,7 @@ class InferenceHost extends EventEmitter {
     this.config = config;
     this.engine = engine;
     this.backendMemory = backendMemory;
+    this.coverage = {}; // cover-size options, merged into config.detection
     this.child = null;
     this.inputSize = null;
     this.selection = null;
@@ -61,11 +62,17 @@ class InferenceHost extends EventEmitter {
         backends,
         selection,
         benchmarkRuns: this.config.inference.benchmarkRuns,
-        detection: { ...this.config.detection, includeFaces: this.config.flags.detectFaces },
+        detection: { ...this.config.detection, ...this.coverage, includeFaces: this.config.flags.detectFaces },
       },
       [workerPort],
     );
     this.emit('port', rendererPort);
+  }
+
+  /** Applies cover-size options now and to any later (re)started worker. */
+  setCoverage(coverage) {
+    this.coverage = coverage;
+    this.child?.postMessage({ type: WorkerMessage.CONFIGURE, detection: coverage });
   }
 
   /** Stops the worker; messages it sends while shutting down are ignored. */

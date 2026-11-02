@@ -19,6 +19,7 @@ const { TrayController } = require('./tray');
 const { SettingsStore } = require('./settings-store');
 const { SettingsWindow } = require('./settings-window');
 const { PatchStore, IMAGE_FILE_EXTENSIONS } = require('./patch-store');
+const { COVER_SIZES, DEFAULT_COVER_SIZE, getCoverSize, coverageOptions } = require('./cover-size');
 const { registerHotkeys, unregisterHotkeys } = require('./hotkeys');
 const { hasScreenRecordingPermission, explainScreenRecordingPermission } = require('./permissions');
 
@@ -41,6 +42,7 @@ class ScreenBlurApp extends EventEmitter {
       thresholdPercent: SENSITIVITY_PRESETS.balanced,
       modelId: DEFAULT_MODEL_ID,
       performanceMode: PERFORMANCE_MODES.best.id,
+      coverSize: DEFAULT_COVER_SIZE,
     });
     const thresholdPercent = clampThresholdPercent(this.settings.get('thresholdPercent'));
     this.engine = resolveEngine(config, {
@@ -56,6 +58,7 @@ class ScreenBlurApp extends EventEmitter {
 
     this.regions = new RegionTracker({ ...config.regionTracking, ...thresholdsFromPercent(thresholdPercent) });
     this.inference = new InferenceHost(config, this.engine, this.createBackendMemory(this.engine.model.id));
+    this.inference.setCoverage(coverageOptions(this.settings.get('coverSize')));
     this.capture = new CaptureHost(config);
     this.overlay = new OverlayManager(config);
     this.tray = null;
@@ -207,6 +210,14 @@ class ScreenBlurApp extends EventEmitter {
     this.updateSettingsWindow();
   }
 
+  /** How much area each cover takes (see cover-size.js); applies from the next result. */
+  setCoverSize(id) {
+    if (!COVER_SIZES[id]) return;
+    this.settings.set('coverSize', id);
+    this.inference.setCoverage(coverageOptions(id));
+    this.updateSettingsWindow();
+  }
+
   get running() {
     const { enabled, snoozedUntil, locked, ready } = this.state;
     return enabled && ready && !locked && snoozedUntil <= Date.now();
@@ -339,6 +350,7 @@ class ScreenBlurApp extends EventEmitter {
       setModel: (modelId) => this.setModel(modelId),
       setPerformanceMode: (mode) => this.setPerformanceMode(mode),
       setPatchStyle: (style) => this.setPatchStyle(style),
+      setCoverSize: (id) => this.setCoverSize(id),
       choosePatchImage: () => this.choosePatchImage(),
       previewPatch: () => this.previewPatch(),
     });
@@ -447,7 +459,13 @@ class ScreenBlurApp extends EventEmitter {
 
   patchViewState() {
     const { imagePath, ...patch } = this.patches.describe();
-    return { ...patch, imageUrl: imagePath ? pathToFileURL(imagePath).href : null };
+    return {
+      ...patch,
+      imageUrl: imagePath ? pathToFileURL(imagePath).href : null,
+      coverSize: getCoverSize(this.settings.get('coverSize')).id,
+      coverSizes: Object.values(COVER_SIZES).map(({ id, name }) => ({ id, name })),
+      bodyContextAvailable: this.engine.model.context.length > 0,
+    };
   }
 }
 

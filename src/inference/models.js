@@ -20,6 +20,12 @@ const MODELS = Object.freeze({
     labels: NUDENET_LABELS,
     targets: Object.freeze(['BUTTOCKS_EXPOSED', 'FEMALE_BREAST_EXPOSED', 'FEMALE_GENITALIA_EXPOSED', 'ANUS_EXPOSED', 'MALE_GENITALIA_EXPOSED']),
     testTargets: Object.freeze(['FACE_FEMALE', 'FACE_MALE']), // --detect-faces
+    // Body parts around explicit areas, used by the "Whole body" cover size. Faces and feet are
+    // left out: covering faces isn't wanted, and feet are too far from the explicit areas.
+    context: Object.freeze([
+      'FEMALE_BREAST_COVERED', 'FEMALE_GENITALIA_COVERED', 'BUTTOCKS_COVERED', 'ANUS_COVERED',
+      'MALE_BREAST_EXPOSED', 'BELLY_EXPOSED', 'BELLY_COVERED', 'ARMPITS_EXPOSED', 'ARMPITS_COVERED',
+    ]),
     license: 'AGPL-3.0',
   }),
   'erax-yolo11n': Object.freeze({
@@ -30,6 +36,7 @@ const MODELS = Object.freeze({
     labels: ERAX_LABELS,
     targets: ERAX_LABELS,
     testTargets: Object.freeze([]),
+    context: Object.freeze([]), // no body-part classes; "Whole body" acts like "Large"
     license: 'Apache-2.0 (EraX), trained with Ultralytics (AGPL-3.0)',
   }),
   'erax-yolo11s': Object.freeze({
@@ -40,6 +47,7 @@ const MODELS = Object.freeze({
     labels: ERAX_LABELS,
     targets: ERAX_LABELS,
     testTargets: Object.freeze([]),
+    context: Object.freeze([]), // no body-part classes; "Whole body" acts like "Large"
     license: 'Apache-2.0 (EraX), trained with Ultralytics (AGPL-3.0)',
   }),
 });
@@ -50,9 +58,7 @@ function getModel(id) {
   return MODELS[id] ?? MODELS[DEFAULT_MODEL_ID];
 }
 
-/** Indices of the classes to blur; test targets are added for --detect-faces. */
-function targetClassIds(model, { includeTestTargets = false } = {}) {
-  const labels = includeTestTargets ? [...model.targets, ...model.testTargets] : model.targets;
+function classIds(model, labels) {
   return labels.map((label) => {
     const id = model.labels.indexOf(label);
     if (id < 0) throw new Error(`${model.id} has no class ${label}`);
@@ -60,4 +66,14 @@ function targetClassIds(model, { includeTestTargets = false } = {}) {
   });
 }
 
-module.exports = { MODELS, DEFAULT_MODEL_ID, getModel, targetClassIds };
+/** Indices of the classes to blur; test targets are added for --detect-faces. */
+function targetClassIds(model, { includeTestTargets = false } = {}) {
+  return classIds(model, includeTestTargets ? [...model.targets, ...model.testTargets] : model.targets);
+}
+
+/** Indices of the surrounding body-part classes used by the "Whole body" cover size. */
+function contextClassIds(model) {
+  return classIds(model, model.context);
+}
+
+module.exports = { MODELS, DEFAULT_MODEL_ID, getModel, targetClassIds, contextClassIds };

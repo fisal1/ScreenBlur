@@ -84,7 +84,8 @@ measured once per model and remembered, so later starts load only that device.
 Runs every model on each image as the app would see it on a 1920x1080 screen (`--alone` scores
 the image filling the model input instead) and prints each model's score, areas and speed, plus
 a summary of how many images each model would blur at `--threshold` (default 30). With `--out`
-it saves a side-by-side picture per image with each model's boxes, and `summary.csv`.
+it saves a side-by-side picture per image with each model's boxes and, shaded blue, exactly
+what the app would cover at `--cover normal|large|body` (default large), and `summary.csv`.
 Everything stays on your computer. The EraX models are converted from PyTorch with
 `uv run scripts/convert-erax.py` (already done; the converted files are downloaded by
 `scripts/fetch-model.js`).
@@ -107,8 +108,12 @@ them as a GitHub Release when a version tag (`v*`) is pushed. `build/icon.png` i
 1. A hidden window captures the primary display at the model input size (960x544 on 16:9) and
    sends each new frame as soon as the capture stream delivers it (up to 30 fps). The model runs
    on the fastest device found at startup (GPU via DirectML, CoreML or CUDA, otherwise CPU).
-2. The detection model (NudeNet or EraX, see Settings) finds explicit areas; overlapping boxes
-   are merged and each box is padded by 20% so small movements don't expose its edges.
+2. The detection model (NudeNet or EraX, see Settings) finds explicit areas. The cover size
+   (Settings > Cover style) decides how much each cover takes: Normal (20% margin), Large
+   (default: 50% margin, covers that touch merge into one) or Whole body (Large, plus the body
+   parts NudeNet detects around the area: belly, armpits, covered chest/hips). Once something
+   explicit is confirmed on screen, other parts are covered from half the threshold, so a part
+   scoring just under it next to a covered one doesn't stay visible.
 3. Each area is covered according to Settings > Cover style: the default GIF
    (`assets/patch.gif`), your own GIF or image, or a blur (a tiny averaged-color grid of what's
    underneath, drawn scaled up and blurred, so it can't be seen through). Images are cropped to
@@ -134,7 +139,8 @@ See "Models and performance mode" for measured speed, memory and CPU use.
 Left-click the tray icon (or choose **Settings...**) to open the settings window: a slider sets
 the score (5-95%) at which an area is blurred, with a live meter of the highest score on screen,
 Cover style chooses what covers detected areas (default GIF, your own GIF / PNG / JPG / WebP up
-to 25 MB, or blur; applies immediately, with a "Preview on screen" button), and the Engine
+to 25 MB, or blur; applies immediately, with a "Preview on screen" button) and the cover size
+(Normal / Large / Whole body), and the Engine
 section picks the model and performance mode. Settings are saved in
 `%APPDATA%\ScreenBlur\settings.json`; a copy of your chosen image is kept in
 `%APPDATA%\ScreenBlur\patches\`, so moving or deleting the original doesn't matter.
@@ -161,6 +167,7 @@ src/
     engine-profile.js     model + performance mode -> devices, input size, frame rate
     settings-store.js     saved settings (JSON in userData)
     patch-store.js        cover style: default GIF, the user's image (validated copy) or blur
+    cover-size.js         cover size presets: margin, merging, whole-body expansion
     window-utils.js       guards against using windows Electron already destroyed
     hotkeys.js            global shortcuts
     self-test.js          Phase 0 checks
@@ -170,7 +177,7 @@ src/
     worker.js             receives frames, runs the model, reports results
     models.js             the detection models (files, classes, which classes to blur)
     yolo.js               YOLO preprocessing, box decoding and NMS
-    regions.js            padding, screen-normalized boxes and blur mosaics
+    regions.js            cover areas (whole-body growth, margin, merging) and blur mosaics
     backend-selector.js   picks the fastest execution provider (DirectML, CoreML, CUDA or CPU)
   renderer/
     capture/              hidden page: screen stream -> model input frames

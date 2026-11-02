@@ -20,3 +20,16 @@ test('clampBox returns an empty box when fully outside', () => {
   assert.equal(clamped.width, 0);
   assert.equal(clamped.height, 0);
 });
+
+const { growBox, boxesTouch } = require('../src/shared/geometry');
+
+test('growBox grows on every side without clamping', () => {
+  assert.deepEqual(growBox({ x: 0, y: 0, width: 10, height: 20 }, 0.5), { x: -5, y: -10, width: 20, height: 40 });
+});
+
+test('boxesTouch is true for overlapping and edge-touching boxes only', () => {
+  const a = { x: 0, y: 0, width: 10, height: 10 };
+  assert.equal(boxesTouch(a, { x: 5, y: 5, width: 10, height: 10 }), true);
+  assert.equal(boxesTouch(a, { x: 10, y: 0, width: 5, height: 5 }), true);
+  assert.equal(boxesTouch(a, { x: 11, y: 0, width: 5, height: 5 }), false);
+});

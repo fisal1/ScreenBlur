@@ -21,7 +21,34 @@ const elements = {
   patchName: document.getElementById('patch-name'),
   choosePatch: document.getElementById('choose-patch'),
   previewPatch: document.getElementById('preview-patch'),
+  coverSizes: document.getElementById('cover-sizes'),
+  coverSizeHint: document.getElementById('cover-size-hint'),
 };
+
+const COVER_SIZE_HINTS = Object.freeze({
+  normal: 'Covers the detected part plus a small margin.',
+  large: 'Bigger margin; covers that touch join into one, so nothing shows between them.',
+  body: 'Also spreads over the body around each detected part (belly, chest, hips).',
+});
+
+function describeCoverSize({ coverSize, bodyContextAvailable }) {
+  if (coverSize === 'body' && !bodyContextAvailable) return 'The selected model can\'t detect surrounding body parts, so this works like Large.';
+  return COVER_SIZE_HINTS[coverSize] ?? '';
+}
+
+function renderCoverSize(patch) {
+  elements.coverSizes.replaceChildren(...patch.coverSizes.map((size) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = size.name;
+    button.className = size.id === patch.coverSize ? 'active' : '';
+    button.setAttribute('role', 'radio');
+    button.setAttribute('aria-checked', String(size.id === patch.coverSize));
+    button.addEventListener('click', () => api.setCoverSize(size.id));
+    return button;
+  }));
+  elements.coverSizeHint.textContent = describeCoverSize(patch);
+}
 
 let renderedPatchKey = null;
 
@@ -59,6 +86,7 @@ function renderPatch(patch) {
   }
   elements.patchName.textContent = describePatch(patch);
   elements.patchName.title = describePatch(patch);
+  renderCoverSize(patch);
 }
 
 elements.choosePatch.addEventListener('click', () => api.choosePatchImage());

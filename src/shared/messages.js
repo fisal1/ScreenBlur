@@ -3,6 +3,7 @@
 /** Messages exchanged with the inference worker. */
 const WorkerMessage = Object.freeze({
   INIT: 'init',
+  CONFIGURE: 'configure', // change detection options (e.g. cover size) without a restart
   READY: 'ready',
   FRAME: 'frame',
   DONE: 'done',
@@ -32,6 +33,7 @@ const IpcChannel = Object.freeze({
   SETTINGS_SET_MODEL: 'settings-set-model',
   SETTINGS_SET_PERFORMANCE_MODE: 'settings-set-performance-mode',
   SETTINGS_SET_PATCH_STYLE: 'settings-set-patch-style',
+  SETTINGS_SET_COVER_SIZE: 'settings-set-cover-size',
   SETTINGS_CHOOSE_PATCH_IMAGE: 'settings-choose-patch-image',
   SETTINGS_PREVIEW_PATCH: 'settings-preview-patch',
   SETTINGS_UPDATE: 'settings-update',

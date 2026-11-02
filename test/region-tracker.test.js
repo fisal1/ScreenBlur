@@ -54,10 +54,28 @@ test('an area follows an overlapping detection above the low threshold', () => {
   assert.equal(tracker.regions[0].confirmedAt, 200);
 });
 
-test('a weak non-overlapping detection does not create an area', () => {
+test('while content is confirmed, other parts above the low threshold are covered too', () => {
   const tracker = new RegionTracker(options);
   update(tracker, 1, 0, [detection(0.5, 0.1, 0.1)]);
-  update(tracker, 2, 200, [detection(0.2, 0.7, 0.7)]);
+  update(tracker, 2, 200, [detection(0.2, 0.7, 0.7)]); // 0.2 < high 0.3, but >= low 0.15
+  assert.equal(tracker.regions.length, 2);
+});
+
+test('a strong and a weak part in the same frame are both covered', () => {
+  const tracker = new RegionTracker(options);
+  update(tracker, 1, 0, [detection(0.5, 0.1, 0.1), detection(0.18, 0.6, 0.6)]);
+  assert.equal(tracker.regions.length, 2);
+});
+
+test('weak detections alone are not covered when nothing explicit is confirmed', () => {
+  const tracker = new RegionTracker(options);
+  update(tracker, 1, 0, [detection(0.2, 0.1, 0.1), detection(0.25, 0.6, 0.6)]);
+  assert.equal(tracker.regions.length, 0);
+});
+
+test('detections below the low threshold are never covered', () => {
+  const tracker = new RegionTracker(options);
+  update(tracker, 1, 0, [detection(0.5, 0.1, 0.1), detection(0.1, 0.6, 0.6)]);
   assert.equal(tracker.regions.length, 1);
 });
 

@@ -3,7 +3,8 @@ const { predictBox, sweptBox } = require('../shared/motion');
 
 // Per-area hysteresis (RFC 6.2, 6.3 applied to each detected area):
 // - Results older than the last applied one (by seq) are ignored.
-// - A new area appears when a detection scores >= thresholdHigh.
+// - A new area appears when a detection scores >= thresholdHigh, or >= thresholdLow while
+//   explicit content is already confirmed on screen ("cover nearby parts").
 // - A tracked area follows any overlapping detection scoring >= thresholdLow.
 // - An area disappears once it hasn't been confirmed for `holdMs`.
 // - dismiss() ("this was wrong") clears all areas and blocks new ones for `dismissMs`.
@@ -112,8 +113,12 @@ class RegionTracker {
       this.follow(region, match, capturedAt, now);
     }
 
+    // Once explicit content is confirmed on screen, other parts only need thresholdLow: a part
+    // scoring just under the threshold next to a covered one shouldn't stay visible.
+    const confirmed = this.regions.length > 0 || candidates.some((detection) => detection.score >= thresholdHigh);
+    const newAreaThreshold = confirmed ? thresholdLow : thresholdHigh;
     for (const detection of candidates) {
-      if (used.has(detection) || detection.score < thresholdHigh) continue;
+      if (used.has(detection) || detection.score < newAreaThreshold) continue;
       if (this.regions.some((region) => iou(region.box, detection.box) >= matchIou)) continue;
       this.regions.push({ id: this.nextId++, ...detection, velocity: { x: 0, y: 0 }, capturedAt, confirmedAt: now, detectedAt: now });
     }

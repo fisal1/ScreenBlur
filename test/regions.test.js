@@ -44,3 +44,51 @@ test('detections inside the black padding are dropped', () => {
   );
   assert.equal(regions.length, 0);
 });
+
+// ---- cover size: margin, merging, whole body ----
+const { coverAreas, expandWithContext, mergeTouching } = require('../src/inference/regions');
+
+const CONTENT = { x: 0, y: 0, width: 1000, height: 1000 };
+const area = (x, y, width, height, score = 0.5, label = 'TEST') => ({ score, label, box: { x, y, width, height } });
+
+test('normal cover: 20% margin, separate areas stay separate', () => {
+  const covers = coverAreas([area(100, 100, 100, 100), area(230, 100, 100, 100)], [], CONTENT, { padding: 0.2 });
+  assert.equal(covers.length, 2);
+  assert.deepEqual(covers[0].box, { x: 80, y: 80, width: 140, height: 140 });
+});
+
+test('large cover: 50% margin and touching covers merge into one', () => {
+  const covers = coverAreas([area(100, 100, 100, 100, 0.6, 'A'), area(230, 100, 100, 100, 0.3, 'B')], [], CONTENT, { padding: 0.5, merge: true });
+  assert.equal(covers.length, 1);
+  assert.deepEqual(covers[0].box, { x: 50, y: 50, width: 330, height: 200 });
+  assert.equal(covers[0].score, 0.6);
+  assert.equal(covers[0].label, 'A');
+});
+
+test('merging is transitive: a cover that grows can swallow an earlier one', () => {
+  const merged = mergeTouching([area(0, 0, 10, 10), area(100, 0, 10, 10), area(5, 0, 100, 10)]);
+  assert.equal(merged.length, 1);
+  assert.deepEqual(merged[0].box, { x: 0, y: 0, width: 110, height: 10 });
+});
+
+test('whole body: a cover grows over nearby body parts but not distant ones', () => {
+  const chest = { x: 400, y: 300, width: 100, height: 80 };
+  const belly = { box: { x: 380, y: 400, width: 140, height: 120 } }; // just below the chest
+  const farAway = { box: { x: 900, y: 900, width: 50, height: 50 } };
+  const grown = expandWithContext(chest, [belly, farAway], 0.6);
+  assert.deepEqual(grown, { x: 380, y: 300, width: 140, height: 220 });
+});
+
+test('whole body is only used when enabled', () => {
+  const chest = area(400, 300, 100, 80);
+  const belly = { box: { x: 380, y: 400, width: 140, height: 120 } };
+  const [without] = coverAreas([chest], [belly], CONTENT, { padding: 0, bodyContext: false });
+  const [withBody] = coverAreas([chest], [belly], CONTENT, { padding: 0, bodyContext: true, contextReach: 0.6 });
+  assert.deepEqual(without.box, chest.box);
+  assert.deepEqual(withBody.box, { x: 380, y: 300, width: 140, height: 220 });
+});
+
+test('covers never extend past the screen', () => {
+  const [cover] = coverAreas([area(950, 950, 100, 100)], [], CONTENT, { padding: 0.5 });
+  assert.ok(cover.box.x + cover.box.width <= 1000 && cover.box.y + cover.box.height <= 1000);
+});

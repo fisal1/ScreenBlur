@@ -9,9 +9,11 @@
 //   --screen <WxH>      simulated screen size (default: 1920x1080)
 //   --alone             score each image filling the model input instead of shown on a screen
 //   --models <ids>      comma-separated model ids (default: all; see src/inference/models.js)
+//   --cover <size>      cover size to draw: normal, large (default) or body (see src/main/cover-size.js)
 //
 // "Shown on a screen" is what the app sees: the image at its natural size (shrunk to fit) in the
-// middle of the screen, the whole screen scaled to the model input.
+// middle of the screen, the whole screen scaled to the model input. The shaded rectangles in the
+// pictures are what the app would cover, computed the same way as in the app.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -20,9 +22,11 @@ const { app, BrowserWindow } = require('electron');
 const ort = require('onnxruntime-node');
 const config = require('../src/main/config');
 const { modelInputSize } = require('../src/main/model-input');
-const { MODELS, targetClassIds } = require('../src/inference/models');
+const { MODELS, targetClassIds, contextClassIds } = require('../src/inference/models');
 const { rgbaToNchw, analyze } = require('../src/inference/yolo');
+const { coverAreas } = require('../src/inference/regions');
 const { createFastestSession } = require('../src/inference/backend-selector');
+const { COVER_SIZES, coverageOptions } = require('../src/main/cover-size');
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp']);
 const PANEL_HEIGHT = 480;
@@ -33,9 +37,11 @@ function parseArgs(argv) {
     const index = args.indexOf(name);
     return index >= 0 ? args[index + 1] : fallback;
   };
-  const optionValues = new Set(['--out', '--threshold', '--screen', '--models'].map(option));
+  const optionValues = new Set(['--out', '--threshold', '--screen', '--models', '--cover'].map(option));
   const input = args.find((arg) => !arg.startsWith('--') && !optionValues.has(arg));
-  if (!input) throw new Error('Usage: electron scripts/compare-models.js <image-or-folder> [--out folder] [--threshold 30] [--screen 1920x1080] [--alone] [--models ids]');
+  if (!input) throw new Error('Usage: electron scripts/compare-models.js <image-or-folder> [--out folder] [--threshold 30] [--screen 1920x1080] [--alone] [--models ids] [--cover large]');
+  const cover = option('--cover', 'large');
+  if (!COVER_SIZES[cover]) throw new Error(`Unknown cover size ${cover}. Known: ${Object.keys(COVER_SIZES).join(', ')}`);
   const [width, height] = option('--screen', '1920x1080').split('x').map(Number);
   const modelIds = option('--models', Object.keys(MODELS).join(',')).split(',');
   const unknown = modelIds.filter((id) => !MODELS[id]);
@@ -47,6 +53,7 @@ function parseArgs(argv) {
     screen: { width, height },
     alone: args.includes('--alone'),
     models: modelIds.map((id) => MODELS[id]),
+    cover,
   };
 }
 
@@ -103,6 +110,14 @@ const PAGE_HELPERS = `
     panels.forEach((panel, i) => {
       const x0 = i * pw;
       ctx.drawImage(img, x0, header, pw, panelHeight);
+      for (const cover of panel.covers) { // what the app would cover
+        const cx = x0 + cover.x * scale, cy = header + cover.y * scale, cw = cover.width * scale, ch = cover.height * scale;
+        ctx.fillStyle = 'rgba(79, 195, 247, 0.55)';
+        ctx.fillRect(cx, cy, cw, ch);
+        ctx.setLineDash([8, 5]); ctx.strokeStyle = '#4fc3f7'; ctx.lineWidth = 2;
+        ctx.strokeRect(cx, cy, cw, ch);
+        ctx.setLineDash([]);
+      }
       ctx.fillStyle = panel.wouldBlur ? '#e74c3c' : '#2ecc71';
       ctx.font = 'bold 15px Segoe UI, sans-serif';
       ctx.fillText(panel.title, x0 + 8, 22);
@@ -129,25 +144,40 @@ async function loadModel(model) {
   if (!fs.existsSync(file)) throw new Error(`${model.name}: ${file} is missing; run "node scripts/fetch-model.js"`);
   const probeSize = { width: 960, height: 544 };
   const { session, label } = await createFastestSession(ort, file, probeSize, config.inference.backends, 3);
-  return { model, session, backend: label, classIds: targetClassIds(model) };
+  return { model, session, backend: label, classIds: targetClassIds(model), contextIds: contextClassIds(model) };
 }
 
-async function runModel({ model, session, classIds }, prepared, inputSize) {
+/**
+ * What the app would cover in this frame: nothing unless some detection reaches the threshold;
+ * then every detection above half of it ("cover nearby parts"), sized by the cover size.
+ */
+function coversFor(detections, context, bounds, threshold, coverage) {
+  if (!detections.some((d) => d.score >= threshold)) return [];
+  return coverAreas(detections.filter((d) => d.score >= threshold / 2), context, bounds, coverage);
+}
+
+async function runModel({ model, session, classIds, contextIds }, prepared, inputSize, { threshold, cover }) {
   const { width, height } = inputSize;
   const tensor = new ort.Tensor('float32', rgbaToNchw(prepared.rgba, width, height), [1, 3, height, width]);
   const started = performance.now();
   const outputs = await session.run({ [session.inputNames[0]]: tensor });
   const ms = performance.now() - started;
-  const { score, label, detections } = analyze(outputs[session.outputNames[0]], model.labels, classIds, config.detection);
+  const output = outputs[session.outputNames[0]];
+  const coverage = coverageOptions(cover);
+  const { score, label, detections } = analyze(output, model.labels, classIds, config.detection);
+  const context = coverage.bodyContext && contextIds.length
+    ? analyze(output, model.labels, contextIds, { ...config.detection, minScore: coverage.contextMinScore }).detections
+    : [];
 
   // Model pixels -> image pixels; keep only boxes that overlap the image.
   const { rect, imageSize } = prepared;
   const sx = imageSize.width / rect.width;
   const sy = imageSize.height / rect.height;
-  const boxes = detections
-    .map((d) => ({ label: d.label, score: d.score, x: (d.box.x - rect.x) * sx, y: (d.box.y - rect.y) * sy, width: d.box.width * sx, height: d.box.height * sy }))
-    .filter((b) => b.x < imageSize.width && b.y < imageSize.height && b.x + b.width > 0 && b.y + b.height > 0);
-  return { score, label, boxes, ms };
+  const toImage = (box) => ({ x: (box.x - rect.x) * sx, y: (box.y - rect.y) * sy, width: box.width * sx, height: box.height * sy });
+  const onImage = (b) => b.x < imageSize.width && b.y < imageSize.height && b.x + b.width > 0 && b.y + b.height > 0;
+  const boxes = detections.map((d) => ({ label: d.label, score: d.score, ...toImage(d.box) })).filter(onImage);
+  const covers = coversFor(detections, context, rect, threshold, coverage).map((c) => toImage(c.box)).filter(onImage);
+  return { score, label, boxes, covers, ms };
 }
 
 function percent(value) {
@@ -185,7 +215,7 @@ async function main() {
   await page.webContents.executeJavaScript(`${PAGE_HELPERS}; true`); // the last value is returned; functions can't be
 
   const mode = options.alone ? 'image alone' : `shown on a ${options.screen.width}x${options.screen.height} screen`;
-  console.log(`\nScoring ${images.length} image(s), ${mode}; "would blur" at ${percent(options.threshold).trim()}\n`);
+  console.log(`\nScoring ${images.length} image(s), ${mode}; "would blur" at ${percent(options.threshold).trim()}; cover size ${COVER_SIZES[options.cover].name}\n`);
   const stats = new Map(loaded.map(({ model }) => [model.id, { blurred: 0, scores: [], ms: [] }]));
   const csv = [csvRow(['image', ...loaded.flatMap(({ model }) => [`${model.id} score`, `${model.id} areas`, `${model.id} ms`])])];
 
@@ -200,7 +230,7 @@ async function main() {
     const panels = [];
     const row = [path.basename(imagePath)];
     for (const entry of loaded) {
-      const result = await runModel(entry, prepared, inputSize);
+      const result = await runModel(entry, prepared, inputSize, options);
       const wouldBlur = result.score >= options.threshold;
       const counted = result.boxes.filter((b) => b.score >= options.threshold);
       const stat = stats.get(entry.model.id);
@@ -212,6 +242,7 @@ async function main() {
         title: `${entry.model.name}: ${percent(result.score).trim()}${wouldBlur ? ' (blur)' : ''}`,
         wouldBlur,
         boxes: result.boxes.map((b) => ({ ...b, counts: b.score >= options.threshold })),
+        covers: result.covers,
       });
       row.push(result.score.toFixed(3), counted.length, result.ms.toFixed(1));
     }
@@ -232,7 +263,7 @@ async function main() {
   if (options.out) {
     fs.writeFileSync(path.join(options.out, 'summary.csv'), csv.join('\n') + '\n');
     console.log(`\nPictures and summary.csv saved to ${options.out}`);
-    console.log('Red boxes count toward blurring (score >= threshold); yellow boxes are below it.');
+    console.log('Shaded blue = what the app would cover. Red boxes reach the threshold; yellow boxes are below it.');
   }
 }
 

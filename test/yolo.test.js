@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { rgbaToNchw, analyze, classConfidences } = require('../src/inference/yolo');
-const { MODELS, getModel, targetClassIds } = require('../src/inference/models');
+const { MODELS, getModel, targetClassIds, contextClassIds } = require('../src/inference/models');
 
 const MODELS_DIR = path.join(__dirname, '..', 'models');
 const nudenet = MODELS['nudenet-320n'];
@@ -100,9 +100,11 @@ for (const model of Object.values(MODELS)) {
   });
 }
 
-test('every model lists its targets among its labels', () => {
+test('every model lists its targets and body-part context among its labels', () => {
   for (const model of Object.values(MODELS)) {
     assert.doesNotThrow(() => targetClassIds(model, { includeTestTargets: true }), model.id);
+    assert.doesNotThrow(() => contextClassIds(model), model.id);
+    assert.ok(model.context.every((label) => !model.targets.includes(label)), `${model.id}: context must not repeat targets`);
   }
 });
 

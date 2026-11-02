@@ -1,6 +1,50 @@
-// Turns detections (model input pixels) into screen regions: padded, normalized to the
-// captured screen (0..1), each with a tiny averaged-color mosaic used to draw the blur.
-const { padBox } = require('../shared/geometry');
+// Turns detections (model input pixels) into the areas to cover: grown to the surrounding body
+// (optional), padded, merged where they touch, normalized to the captured screen (0..1), each
+// with a tiny averaged-color mosaic used to draw the blur.
+const { growBox, padBox, boxesTouch, unionBox } = require('../shared/geometry');
+
+/**
+ * Grows an explicit area to include the body-part detections around it (belly, armpits,
+ * covered chest or hips...), so the cover spans the body rather than just the detected part.
+ * Only context boxes within `reach` (fraction of the area's size) of the area are added; this
+ * is a single pass so it can't chain from one person to the next.
+ */
+function expandWithContext(box, contextDetections, reach) {
+  const nearby = growBox(box, reach);
+  return contextDetections.reduce((result, { box: other }) => (boxesTouch(nearby, other) ? unionBox(result, other) : result), box);
+}
+
+/** Merges areas that overlap or touch into one, keeping the highest score and its label. */
+function mergeTouching(areas) {
+  const merged = [...areas];
+  for (let i = 0; i < merged.length; i++) {
+    for (let j = i + 1; j < merged.length; j++) {
+      if (!boxesTouch(merged[i].box, merged[j].box)) continue;
+      const [stronger, weaker] = merged[i].score >= merged[j].score ? [merged[i], merged[j]] : [merged[j], merged[i]];
+      merged[i] = { ...stronger, box: unionBox(stronger.box, weaker.box) };
+      merged.splice(j, 1);
+      j = i; // the bigger box may now touch earlier ones
+    }
+  }
+  return merged;
+}
+
+/**
+ * The areas to cover, in model input pixels.
+ * @param detections explicit detections ({ box, score, label })
+ * @param contextDetections non-explicit body-part detections ({ box }), used when bodyContext is on
+ * @param content the screen area inside the (letterboxed) frame
+ * @param coverage { padding, merge, bodyContext, contextReach } (see main/cover-size.js)
+ */
+function coverAreas(detections, contextDetections, content, { padding, merge = false, bodyContext = false, contextReach = 0.6 }) {
+  let areas = detections.map((detection) => ({
+    ...detection,
+    box: bodyContext ? expandWithContext(detection.box, contextDetections, contextReach) : detection.box,
+  }));
+  areas = areas.map((area) => ({ ...area, box: padBox(area.box, padding, content) }));
+  if (merge) areas = mergeTouching(areas);
+  return areas.filter(({ box }) => box.width >= 1 && box.height >= 1);
+}
 
 /** Averages the pixels of `box` into a cols x rows RGBA grid. */
 function mosaic(rgba, frameWidth, box, cells) {
@@ -42,16 +86,15 @@ function mosaic(rgba, frameWidth, box, cells) {
 }
 
 /**
- * @param detections boxes in model input pixels
+ * @param detections explicit detections, boxes in model input pixels
  * @param frame { rgba, width, contentWidth, contentHeight } - the screen occupies the top-left
  *        contentWidth x contentHeight of the frame; the rest is padding
- * @param options { padding, mosaicCells }
+ * @param options coverage options (see coverAreas) plus mosaicCells
+ * @param contextDetections non-explicit body-part detections for bodyContext
  */
-function toScreenRegions(detections, frame, { padding, mosaicCells }) {
+function toScreenRegions(detections, frame, options, contextDetections = []) {
   const content = { x: 0, y: 0, width: frame.contentWidth, height: frame.contentHeight };
-  return detections
-    .map((detection) => ({ ...detection, box: padBox(detection.box, padding, content) }))
-    .filter(({ box }) => box.width >= 1 && box.height >= 1)
+  return coverAreas(detections, contextDetections, content, options)
     .map(({ score, label, box }) => ({
       score,
       label,
@@ -61,8 +104,8 @@ function toScreenRegions(detections, frame, { padding, mosaicCells }) {
         width: box.width / content.width,
         height: box.height / content.height,
       },
-      mosaic: mosaic(frame.rgba, frame.width, box, mosaicCells),
+      mosaic: mosaic(frame.rgba, frame.width, box, options.mosaicCells),
     }));
 }
 
-module.exports = { mosaic, toScreenRegions };
+module.exports = { mosaic, toScreenRegions, coverAreas, expandWithContext, mergeTouching };

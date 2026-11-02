@@ -286,3 +286,7 @@ h2 {
 .action.secondary:hover {
   border-color: var(--accent);
 }
+
+.cover-size-label {
+  margin-top: 16px;
+}

@@ -4,7 +4,7 @@
 const ort = require('onnxruntime-node');
 const { WorkerMessage } = require('../shared/messages');
 const { rgbaToNchw, analyze } = require('./yolo');
-const { getModel, targetClassIds } = require('./models');
+const { getModel, targetClassIds, contextClassIds } = require('./models');
 const { toScreenRegions } = require('./regions');
 const { createFastestSession, createFirstWorkingSession } = require('./backend-selector');
 
@@ -29,19 +29,29 @@ class Detector {
     this.backend = { ...backend, label, medianMs, attempts };
     this.labels = model.labels;
     this.classIds = classIds;
+    this.contextClassIds = contextClassIds(model);
     this.inputName = session.inputNames[0];
     this.outputName = session.outputNames[0];
     this.input = new Float32Array(0);
   }
 
-  /** Accepts any frame size that is a multiple of the model stride. */
+  /**
+   * Accepts any frame size that is a multiple of the model stride.
+   * @returns { score, label, detections, context } - context holds surrounding body parts when
+   *          options.bodyContext is on and the model has such classes
+   */
   async detect(rgba, width, height, options) {
     const length = 3 * width * height;
     if (this.input.length !== length) this.input = new Float32Array(length);
     rgbaToNchw(rgba, width, height, this.input);
     const tensor = new ort.Tensor('float32', this.input, [1, 3, height, width]);
-    const outputs = await this.session.run({ [this.inputName]: tensor });
-    return analyze(outputs[this.outputName], this.labels, this.classIds, options);
+    const output = (await this.session.run({ [this.inputName]: tensor }))[this.outputName];
+    const result = analyze(output, this.labels, this.classIds, options);
+    const wantsContext = options.bodyContext && this.contextClassIds.length > 0 && result.detections.length > 0;
+    const context = wantsContext
+      ? analyze(output, this.labels, this.contextClassIds, { ...options, minScore: options.contextMinScore }).detections
+      : [];
+    return { ...result, context };
   }
 }
 
@@ -65,8 +75,8 @@ async function handleFrame(detector, frame, detection) {
   const started = performance.now();
   const rgba = toBytes(frame.data);
   validateFrame(frame, rgba);
-  const { score, label, detections } = await detector.detect(rgba, frame.width, frame.height, detection);
-  const regions = toScreenRegions(detections, { ...frame, rgba }, detection);
+  const { score, label, detections, context } = await detector.detect(rgba, frame.width, frame.height, detection);
+  const regions = toScreenRegions(detections, { ...frame, rgba }, detection, context);
   parentPort.postMessage({
     type: WorkerMessage.RESULT,
     seq: frame.seq,
@@ -115,7 +125,10 @@ class FrameQueue {
   }
 }
 
-function listenForFrames(detector, port, detection) {
+// Detection options (thresholds, cover size...); set at INIT, changed live by CONFIGURE.
+let detection = null;
+
+function listenForFrames(detector, port) {
   const queue = new FrameQueue(
     (frame) => handleFrame(detector, frame, detection),
     (frame) => port.postMessage({ type: WorkerMessage.DONE, seq: frame.seq }),
@@ -126,10 +139,8 @@ function listenForFrames(detector, port, detection) {
   port.start();
 }
 
-parentPort.on('message', async ({ data: message, ports }) => {
-  if (message.type !== WorkerMessage.INIT) return;
-
-  const { detection } = message;
+async function init(message, port) {
+  detection = message.detection;
   const model = getModel(message.modelId);
 
   let detector;
@@ -141,11 +152,16 @@ parentPort.on('message', async ({ data: message, ports }) => {
     return;
   }
 
-  listenForFrames(detector, ports[0], detection);
+  listenForFrames(detector, port);
   parentPort.postMessage({
     type: WorkerMessage.READY,
     modelId: model.id,
     inputSize: message.inputSize,
     backend: detector.backend,
   });
+}
+
+parentPort.on('message', ({ data: message, ports }) => {
+  if (message.type === WorkerMessage.INIT) init(message, ports[0]);
+  if (message.type === WorkerMessage.CONFIGURE) detection = { ...detection, ...message.detection };
 });

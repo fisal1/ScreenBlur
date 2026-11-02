@@ -15,11 +15,21 @@ function iou(a, b) {
   return union > 0 ? intersection / union : 0;
 }
 
-/** Grows a box by `fraction` of its size on every side, then clamps it to `bounds`. */
-function padBox(box, fraction, bounds) {
+/** Grows a box by `fraction` of its size on every side. */
+function growBox(box, fraction) {
   const dx = box.width * fraction;
   const dy = box.height * fraction;
-  return clampBox({ x: box.x - dx, y: box.y - dy, width: box.width + 2 * dx, height: box.height + 2 * dy }, bounds);
+  return { x: box.x - dx, y: box.y - dy, width: box.width + 2 * dx, height: box.height + 2 * dy };
+}
+
+/** Grows a box by `fraction` of its size on every side, then clamps it to `bounds`. */
+function padBox(box, fraction, bounds) {
+  return clampBox(growBox(box, fraction), bounds);
+}
+
+/** True if the boxes overlap or touch. */
+function boxesTouch(a, b) {
+  return a.x <= b.x + b.width && b.x <= a.x + a.width && a.y <= b.y + b.height && b.y <= a.y + a.height;
 }
 
 function clampBox(box, bounds) {
@@ -50,4 +60,4 @@ function translateBox(box, dx, dy) {
   return { ...box, x: box.x + dx, y: box.y + dy };
 }
 
-module.exports = { area, iou, padBox, clampBox, unionBox, center, translateBox };
+module.exports = { area, iou, growBox, padBox, boxesTouch, clampBox, unionBox, center, translateBox };
