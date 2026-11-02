@@ -41,6 +41,7 @@ function createPipeline({ onResult = () => {} } = {}) {
     ready: true,
     frameNumber: 1,
     frameCapturedAt: Date.now(),
+    frameCapturedAtMonotonic: performance.now(),
     thumbnailSize: { width: 2, height: 2 },
     onFrame() {},
     thumbnail: () => new Uint8Array([0, 0, 0, 0]),
@@ -115,7 +116,12 @@ test('remote pipeline rejects a late result without changing overlay state', (t)
   pipeline.transport = { ready: true, format: 'jpeg', profile: 'mid', maxInFlight: 1 };
   const seq = 2;
   const capturedAt = Date.now() - 2000;
-  pipeline.inFlight.set(seq, { sentAt: performance.now(), capturedAt, sceneChange: 1 });
+  pipeline.inFlight.set(seq, {
+    sentAt: performance.now(),
+    capturedAt,
+    capturedAtMonotonic: performance.now() - 2000,
+    sceneChange: 1,
+  });
   pipeline.handleRemoteResult({
     seq,
     correlationId: `frame-${seq}-${capturedAt}`,
@@ -129,6 +135,33 @@ test('remote pipeline rejects a late result without changing overlay state', (t)
   assert.equal(results, 0);
   assert.equal(pipeline.inFlight.size, 0);
   pipeline.pause();
+});
+
+test('remote freshness uses the monotonic capture clock, not the echoed wall-clock timestamp', (t) => {
+  let results = 0;
+  const { pipeline } = createPipeline({ onResult: () => { results++; } });
+  t.after(() => pipeline.pause());
+  pipeline.transport = { ready: true, format: 'jpeg', profile: 'mid', maxInFlight: 1 };
+  const seq = 3;
+  const capturedAt = Date.now() - 78_777;
+  pipeline.inFlight.set(seq, {
+    sentAt: performance.now(),
+    capturedAt,
+    capturedAtMonotonic: performance.now(),
+    sceneChange: 1,
+  });
+  pipeline.handleRemoteResult({
+    seq,
+    correlationId: `frame-${seq}-${capturedAt}`,
+    captureTimestampMs: capturedAt,
+    score: 0,
+    label: null,
+    inferenceMs: 10,
+    modelVersion: 'nudenet-320n',
+    regions: [],
+  });
+  assert.equal(results, 1);
+  assert.equal(pipeline.inFlight.size, 0);
 });
 
 test('remote request timeout releases the single in-flight slot', (t) => {

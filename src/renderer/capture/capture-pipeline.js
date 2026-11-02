@@ -191,9 +191,15 @@ class CapturePipeline {
     const frame = {
       seq,
       ts: this.sampler.frameCapturedAt,
+      capturedAtMonotonic: this.sampler.frameCapturedAtMonotonic,
       sceneChange,
     };
-    this.inFlight.set(seq, { sentAt: now, capturedAt: frame.ts, sceneChange });
+    this.inFlight.set(seq, {
+      sentAt: now,
+      capturedAt: frame.ts,
+      capturedAtMonotonic: frame.capturedAtMonotonic,
+      sceneChange,
+    });
     this.lastSentAt = now;
     this.lastSentFrame = this.sampler.frameNumber;
 
@@ -244,7 +250,7 @@ class CapturePipeline {
     }
 
     const maxAgeMs = this.settings.maxFrameAgeMs ?? 1500;
-    const ageMs = Date.now() - pending.capturedAt;
+    const ageMs = performance.now() - pending.capturedAtMonotonic;
     if (ageMs > maxAgeMs || message.captureTimestampMs !== pending.capturedAt) {
       this.onInferenceState?.('stale', `Ignored a result ${Math.round(ageMs)} ms after capture`);
       this.trySend();

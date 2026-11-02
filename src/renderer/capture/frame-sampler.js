@@ -31,6 +31,7 @@ class FrameSampler {
     this.probeContext = createContext(PROBE_WIDTH, PROBE_HEIGHT);
     this.frameNumber = 0;
     this.frameCapturedAt = Date.now();
+    this.frameCapturedAtMonotonic = performance.now();
     this.frameListener = null;
     this.watchFrames();
   }
@@ -45,11 +46,10 @@ class FrameSampler {
   }
 
   watchFrames() {
-    const onVideoFrame = (_now, metadata) => {
+    const onVideoFrame = () => {
       this.frameNumber += 1;
-      // captureTime is when the screen was captured (performance.now() timebase).
-      const capturedAt = metadata.captureTime ?? metadata.presentationTime;
-      this.frameCapturedAt = performance.timeOrigin + capturedAt;
+      this.frameCapturedAt = Date.now();
+      this.frameCapturedAtMonotonic = performance.now();
       this.frameListener?.();
       this.video.requestVideoFrameCallback(onVideoFrame);
     };
