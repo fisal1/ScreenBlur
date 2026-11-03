@@ -33,6 +33,8 @@ class Detector {
     this.inputName = session.inputNames[0];
     this.outputName = session.outputNames[0];
     this.input = new Float32Array(0);
+    this.tensor = null;
+    this.feeds = null;
   }
 
   /**
@@ -42,16 +44,15 @@ class Detector {
    */
   async detect(rgba, width, height, options) {
     const length = 3 * width * height;
-    if (this.input.length !== length) this.input = new Float32Array(length);
+    if (this.input.length !== length) {
+      this.input = new Float32Array(length);
+      this.tensor = new ort.Tensor('float32', this.input, [1, 3, height, width]);
+      this.feeds = { [this.inputName]: this.tensor };
+    }
     rgbaToNchw(rgba, width, height, this.input);
-    const tensor = new ort.Tensor('float32', this.input, [1, 3, height, width]);
-    const output = (await this.session.run({ [this.inputName]: tensor }))[this.outputName];
-    const result = analyze(output, this.labels, this.classIds, options);
-    const wantsContext = options.bodyContext && this.contextClassIds.length > 0 && result.detections.length > 0;
-    const context = wantsContext
-      ? analyze(output, this.labels, this.contextClassIds, { ...options, minScore: options.contextMinScore }).detections
-      : [];
-    return { ...result, context };
+    const output = (await this.session.run(this.feeds))[this.outputName];
+    const wantsContext = options.bodyContext && this.contextClassIds.length > 0;
+    return analyze(output, this.labels, this.classIds, options, wantsContext ? this.contextClassIds : []);
   }
 }
 

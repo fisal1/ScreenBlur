@@ -312,7 +312,7 @@ class ScreenBlurApp extends EventEmitter {
     if (update.stale) return;
     if (this.config.flags.verbose) this.logResult(result, this.regions.motionStates(), now);
     // Moving areas need a fresh predicted position on every result, not just when areas change.
-    if (update.changed || this.regions.active) this.updateOverlay();
+    if (update.changed || this.regions.active) this.updateOverlay({ changed: update.changed });
   }
 
   /** One line per result; each area as [x%,y% w x h% score v=vx,vy screens/s at=capture time]. */
@@ -398,7 +398,7 @@ class ScreenBlurApp extends EventEmitter {
     this.updateOverlay();
   }
 
-  updateOverlay() {
+  updateOverlay({ changed = true } = {}) {
     if (this.stopped) return;
     if (this.state.testOverlay) {
       this.overlay.renderTestRegion();
@@ -406,7 +406,9 @@ class ScreenBlurApp extends EventEmitter {
       this.overlay.render(this.overlayEnabled && this.running ? this.regions.motionStates() : []);
     }
     this.updateCaptureMask();
-    this.updateTray();
+    // Moving areas re-render on every result (~30/s); the tray icon and tooltip only need to change
+    // when areas appear or disappear. The trayRefreshMs timer keeps the score in the tooltip current.
+    if (changed) this.updateTray();
   }
 
   /** Where our overlay shows up in the capture, tell change detection to ignore it. */

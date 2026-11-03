@@ -34,4 +34,10 @@ if (-not (Test-Path "$root\node_modules")) { npm install }
 # npm may block dependency install scripts, so fetch the Electron binary and model explicitly.
 if (-not (Test-Path "$root\node_modules\electron\dist\electron.exe")) { node "$root\node_modules\electron\install.js" }
 if (-not (Test-Path "$root\models\320n.onnx")) { node "$root\scripts\fetch-model.js" }
-if ($Script -eq 'start' -or $Script -eq 'test') { npm $Script } else { npm run $Script }
+if ($Script -eq 'verbose') {
+    & "$root\node_modules\electron\dist\electron.exe" . --verbose 2>&1 | Where-Object { $_ -notmatch 'mouse_cursor_monitor_win' }
+} elseif ($Script -eq 'start' -or $Script -eq 'test') {
+    npm $Script
+} else {
+    npm run $Script
+}

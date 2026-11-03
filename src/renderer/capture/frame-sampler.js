@@ -4,12 +4,13 @@ const HAVE_CURRENT_DATA = 2;
 const PROBE_WIDTH = 160;
 const PROBE_HEIGHT = 90;
 
-function createContext(width, height) {
+/** @param smoothingQuality 'high' for model input; 'low' is enough for the change-detection thumbnail */
+function createContext(width, height, smoothingQuality = 'high') {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext('2d', { willReadFrequently: true });
-  context.imageSmoothingQuality = 'high';
+  context.imageSmoothingQuality = smoothingQuality;
   return context;
 }
 
@@ -27,7 +28,7 @@ class FrameSampler {
       height: Math.max(1, Math.round((thumbnailWidth * inputSize.height) / inputSize.width)),
     };
     this.frameContext = createContext(inputSize.width, inputSize.height);
-    this.thumbnailContext = createContext(this.thumbnailSize.width, this.thumbnailSize.height);
+    this.thumbnailContext = createContext(this.thumbnailSize.width, this.thumbnailSize.height, 'low');
     this.probeContext = createContext(PROBE_WIDTH, PROBE_HEIGHT);
     this.frameNumber = 0;
     this.frameCapturedAt = Date.now();
@@ -79,8 +80,15 @@ class FrameSampler {
     const contentWidth = Math.round(videoWidth * scale);
     const contentHeight = Math.round(videoHeight * scale);
     const context = this.frameContext;
-    context.fillStyle = '#000';
-    context.fillRect(0, 0, width, height);
+    // drawImage never touches the padding, so it only needs painting black when the content size
+    // changes (e.g. a resolution change), not on every frame. Note the padding is rarely empty:
+    // sides are rounded up to multiples of 32, so 1920x1080 fills 960x540 of a 960x544 frame.
+    if (contentWidth !== this.paintedContentWidth || contentHeight !== this.paintedContentHeight) {
+      context.fillStyle = '#000';
+      context.fillRect(0, 0, width, height);
+      this.paintedContentWidth = contentWidth;
+      this.paintedContentHeight = contentHeight;
+    }
     context.drawImage(this.video, 0, 0, contentWidth, contentHeight);
     return { image: context.getImageData(0, 0, width, height), contentWidth, contentHeight };
   }
@@ -104,8 +112,14 @@ class FrameSampler {
  */
 function countChangedPixels(a, b, delta, ignore = null) {
   let changed = 0;
+  if (!ignore) {
+    for (let i = 0; i < a.length; i++) {
+      if (Math.abs(a[i] - b[i]) > delta) changed++;
+    }
+    return changed;
+  }
   for (let i = 0; i < a.length; i++) {
-    if (ignore?.[i]) continue;
+    if (ignore[i]) continue;
     if (Math.abs(a[i] - b[i]) > delta) changed++;
   }
   return changed;

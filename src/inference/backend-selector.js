@@ -1,5 +1,6 @@
 // Picks the fastest working ONNX Runtime execution provider (GPU via DirectML, CoreML or CUDA,
 // or CPU) by timing a few runs of the model at the real input size.
+const os = require('node:os');
 
 const BACKEND_LABELS = Object.freeze({
   dml: ({ deviceId }) => `GPU ${deviceId} (DirectML)`,
@@ -12,6 +13,16 @@ function describeBackend(backend) {
   return BACKEND_LABELS[backend.name]?.(backend) ?? backend.name.toUpperCase();
 }
 
+/**
+ * Threads for CPU inference: half the logical cores, 2 to 4. Measured on a 16-thread Ryzen 7
+ * 4800H: 4 threads were ~10-12% faster than 2 (640x352: 51 -> 45 ms); more threads stop helping
+ * and take CPU from everything else.
+ */
+function cpuThreadCount() {
+  const cpus = os.cpus()?.length || 4;
+  return Math.max(2, Math.min(4, Math.floor(cpus / 2)));
+}
+
 function sessionOptions(backend) {
   const options = {
     executionProviders: [backend],
@@ -20,7 +31,7 @@ function sessionOptions(backend) {
     logSeverityLevel: 3, // hide "some nodes were not assigned" warnings
   };
   if (backend.name === 'dml') options.enableMemPattern = false; // required by DirectML
-  if (backend.name === 'cpu') options.intraOpNumThreads = 2;
+  if (backend.name === 'cpu') options.intraOpNumThreads = cpuThreadCount();
   return options;
 }
 

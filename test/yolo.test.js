@@ -79,6 +79,27 @@ test('analyze rejects an output that does not match the labels', () => {
   assert.throws(() => analyze({ dims: [1, 10, 5], data: new Float32Array(50) }, nudenet.labels, [0]), /Unexpected model output shape/);
 });
 
+test('analyze decodes target and context detections in a single pass', () => {
+  const output = fakeOutput(nudenet.labels, 10, [
+    ['FEMALE_BREAST_EXPOSED', 0, 0.85],
+    ['BELLY_EXPOSED', 1, 0.7],
+  ]);
+  setBox(output, 0, [50, 50, 20, 20]);
+  setBox(output, 1, [50, 80, 20, 30]);
+
+  const { detections, context } = analyze(
+    output,
+    nudenet.labels,
+    targetClassIds(nudenet),
+    { minScore: 0.5 },
+    contextClassIds(nudenet),
+  );
+  assert.equal(detections.length, 1);
+  assert.equal(detections[0].label, 'FEMALE_BREAST_EXPOSED');
+  assert.equal(context.length, 1);
+  assert.equal(context[0].label, 'BELLY_EXPOSED');
+});
+
 test('classConfidences lists every class, highest first', () => {
   const output = fakeOutput(nudenet.labels, 4, [['FACE_MALE', 2, 0.9], ['FEET_EXPOSED', 1, 0.4]]);
   const [first, second] = classConfidences(output, nudenet.labels);

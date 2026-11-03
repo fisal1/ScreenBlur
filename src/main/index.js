@@ -10,6 +10,10 @@ function selfTestConfig(config) {
 
 /** Command-line switches that must be set before the app is ready. */
 function applyPlatformSwitches(platform, flags) {
+  // Only fatal Chromium log messages: screen capture otherwise floods the console with
+  // harmless warnings (e.g. mouse_cursor_monitor_win). Our own [capture]/[inference] logs are
+  // unaffected.
+  app.commandLine.appendSwitch('log-level', '3');
   // Chromium's GPU process cost ~105 MB for no measurable gain: with it off, capture still ran
   // at ~27 fps with the same CPU use (the model keeps its own GPU through ONNX Runtime).
   if (!flags.chromiumGpu) app.disableHardwareAcceleration();
